@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+PROJECT_DIR="$(cd -- "$(dirname -- "$(readlink -f -- "${BASH_SOURCE[0]}")")/.." && pwd)"
+exec "$PROJECT_DIR/scripts/start-exhibition" --skip-robot "$@"

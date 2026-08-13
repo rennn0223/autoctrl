@@ -1,0 +1,130 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_PATH="$(readlink -f -- "${BASH_SOURCE[0]}")"
+PROJECT_DIR="$(cd -- "$(dirname -- "$SCRIPT_PATH")/.." && pwd)"
+cd "$PROJECT_DIR"
+
+ROBOT_SSH="${AUTOCTRL_ROBOT_SSH:-wheeltec@100.64.0.5}"
+ROBOT_ZENOH_DIR="${AUTOCTRL_ROBOT_ZENOH_DIR:-/opt/zenoh-bridge}"
+LOCAL_ZENOH_DIR="${AUTOCTRL_LOCAL_ZENOH_DIR:-/opt/zenoh-bridge}"
+ROS_SETUP="${AUTOCTRL_ROS_SETUP:-/opt/ros/jazzy/setup.bash}"
+ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-2}"
+ROS_AUTOMATIC_DISCOVERY_RANGE="${ROS_AUTOMATIC_DISCOVERY_RANGE:-LOCALHOST}"
+TOPIC_WAIT_SECONDS="${AUTOCTRL_TOPIC_WAIT_SECONDS:-30}"
+SKIP_ROBOT=0
+SKIP_BRIDGES=0
+
+usage() {
+  printf '%s\n'     "用法：./scripts/start-exhibition [選項] [-- ROS2 參數]"     ""     "  --skip-robot    不透過 SSH 啟動小車 bridge 與底盤 driver"     "  --skip-bridges  不重啟兩端 bridge，只檢查 topics 後啟動 AutoCtrl"     "  --help          顯示說明"     ""     "環境變數："     "  AUTOCTRL_ROBOT_SSH          預設 wheeltec@100.64.0.5"     "  AUTOCTRL_ROBOT_ZENOH_DIR    預設 /opt/zenoh-bridge"     "  AUTOCTRL_LOCAL_ZENOH_DIR    預設 /opt/zenoh-bridge"     "  AUTOCTRL_TOPIC_WAIT_SECONDS 預設 30"     "  ROS_DOMAIN_ID               預設 2"     ""     "範例："     "  ./scripts/start-exhibition"     "  ./scripts/start-exhibition --skip-bridges"     "  ./scripts/start-exhibition -- --ros-args -p turn_linear_speed_mps:=0.30 -p angular_speed_rps:=0.50"
+}
+
+ROS_ARGS=()
+while (($#)); do
+  case "$1" in
+    --skip-robot)
+      SKIP_ROBOT=1
+      shift
+      ;;
+    --skip-bridges)
+      SKIP_BRIDGES=1
+      shift
+      ;;
+    --help|-h)
+      usage
+      exit 0
+      ;;
+    --)
+      shift
+      ROS_ARGS=("$@")
+      break
+      ;;
+    *)
+      echo "未知選項：$1" >&2
+      usage >&2
+      exit 2
+      ;;
+  esac
+done
+
+if [[ ! -f "$ROS_SETUP" ]]; then
+  echo "找不到 ROS2 環境：$ROS_SETUP" >&2
+  exit 1
+fi
+
+export ROS_DOMAIN_ID ROS_AUTOMATIC_DISCOVERY_RANGE
+
+start_robot() {
+  echo "[1/5] 啟動小車 zenoh bridge 與 WHEELTEC 底盤 driver：$ROBOT_SSH"
+  ssh -tt "$ROBOT_SSH"     "export ROS_AUTOMATIC_DISCOVERY_RANGE='$ROS_AUTOMATIC_DISCOVERY_RANGE' ROS_DOMAIN_ID='$ROS_DOMAIN_ID'; sudo ip link set lo multicast on; cd '$ROBOT_ZENOH_DIR'; sudo docker compose down; sudo docker compose up -d; if pgrep -f '[r]os2 launch turn_on_wheeltec_robot turn_on_wheeltec_robot.launch.py' >/dev/null; then   echo 'WHEELTEC driver 已經在執行'; else   nohup zsh -lic \"export ROS_AUTOMATIC_DISCOVERY_RANGE='$ROS_AUTOMATIC_DISCOVERY_RANGE'; export ROS_DOMAIN_ID='$ROS_DOMAIN_ID'; ros2 launch turn_on_wheeltec_robot turn_on_wheeltec_robot.launch.py\"     >/tmp/autoctrl-wheeltec-driver.log 2>&1 </dev/null &   sleep 3;   pgrep -af '[r]os2 launch turn_on_wheeltec_robot' || { echo '底盤 driver 啟動失敗，請查看 /tmp/autoctrl-wheeltec-driver.log' >&2; exit 1; }; fi"
+}
+
+start_local_bridge() {
+  echo "[2/5] 啟動 DGX zenoh bridge"
+  if ! ip link show lo | grep -qw MULTICAST; then
+    echo "需要啟用 loopback multicast（通常只需設定一次）"
+    sudo ip link set lo multicast on
+  fi
+  if [[ ! -d "$LOCAL_ZENOH_DIR" ]]; then
+    echo "找不到 DGX zenoh bridge 目錄：$LOCAL_ZENOH_DIR" >&2
+    exit 1
+  fi
+  (
+    cd "$LOCAL_ZENOH_DIR"
+    docker compose down
+    docker compose up -d
+    docker compose ps
+  )
+}
+
+refresh_ros() {
+  echo "[3/5] 載入 ROS2 Jazzy 並重整 discovery"
+  set +u
+  source "$ROS_SETUP"
+  set -u
+  ros2 daemon stop >/dev/null 2>&1 || true
+  ros2 daemon start >/dev/null
+}
+
+wait_for_topics() {
+  echo "[4/5] 等待 /small/cmd_vel 與 /small/odom（最多 ${TOPIC_WAIT_SECONDS} 秒）"
+  local deadline=$((SECONDS + TOPIC_WAIT_SECONDS))
+  local topics
+  while ((SECONDS < deadline)); do
+    topics="$(ros2 topic list 2>/dev/null || true)"
+    if grep -Fxq '/small/cmd_vel' <<<"$topics" && grep -Fxq '/small/odom' <<<"$topics"; then
+      echo "ROS2 topics 已就緒："
+      printf '  /small/cmd_vel: %s\n' "$(ros2 topic type /small/cmd_vel)"
+      printf '  /small/odom: %s\n' "$(ros2 topic type /small/odom)"
+      return 0
+    fi
+    sleep 1
+  done
+
+  echo "等待逾時。目前 /small topics：" >&2
+  ros2 topic list 2>/dev/null | grep '^/small/' >&2 || true
+  echo "請檢查：" >&2
+  echo "  DGX：cd '$LOCAL_ZENOH_DIR' && sudo docker compose logs --tail=100" >&2
+  echo "  小車：ssh '$ROBOT_SSH' tail -n 100 /tmp/autoctrl-wheeltec-driver.log" >&2
+  return 1
+}
+
+if ((SKIP_BRIDGES == 0)); then
+  if ((SKIP_ROBOT == 0)); then
+    start_robot
+  else
+    echo "[1/5] 略過小車啟動"
+  fi
+  start_local_bridge
+else
+  echo "[1/5] 略過小車啟動"
+  echo "[2/5] 略過兩端 zenoh bridge 重啟"
+fi
+
+refresh_ros
+wait_for_topics
+
+"$PROJECT_DIR/scripts/bootstrap"
+echo "[5/5] 啟動 AutoCtrl；輸入中文命令，Ctrl-C 會先送零速度再退出"
+echo "建議依序測試：停 → 往前 → 停 → 後退 → 停 → 左轉 → 右轉 → 停"
+exec "$PROJECT_DIR/scripts/autoctrl-ros" "${ROS_ARGS[@]}"

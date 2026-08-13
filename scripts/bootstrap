@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+PROJECT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$PROJECT_DIR"
+
+ROS_SETUP="${AUTOCTRL_ROS_SETUP:-/opt/ros/jazzy/setup.bash}"
+if [[ ! -f "$ROS_SETUP" ]]; then
+  echo "找不到 ROS2 環境：$ROS_SETUP" >&2
+  exit 1
+fi
+
+set +u
+source "$ROS_SETUP"
+set -u
+if [[ ! -f .venv/pyvenv.cfg ]] || ! grep -q "include-system-site-packages = true" .venv/pyvenv.cfg; then
+  uv venv --python 3.12 --system-site-packages --clear
+fi
+uv sync
+echo "AutoCtrl 環境已完成：ROS_DISTRO=${ROS_DISTRO:-unknown}"
