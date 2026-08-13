@@ -3,6 +3,7 @@ name = "autoctrl"
 version = "0.1.0"
 description = "Natural-language ROS2 vehicle control for Automation 2026"
 readme = "README.md"
+license = "Apache-2.0"
 requires-python = ">=3.12,<3.13"
 dependencies = ["rich>=13,<15"]
 

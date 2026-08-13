@@ -37,3 +37,9 @@ LLM 只負責理解命令並產生結構化移動意圖；實際速度發布、�
 部署需求、環境設定、小車端準備、一鍵啟動、ROS2 topics、參數調整與測試方式請參閱：
 
 **[Automation 2026 設定與操作手冊](docs/SETUP.md)**
+
+## 授權
+
+Copyright 2026 rennn0223
+
+本專案採用 [Apache License 2.0](LICENSE) 授權。
