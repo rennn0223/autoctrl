@@ -1,6 +1,6 @@
 import unittest
 
-from autoctrl.domain import LinearDirection, MotionKind
+from autoctrl.domain import LinearDirection, MotionKind, StatusKind
 from autoctrl.ollama import InterpretationError, OllamaInterpreter
 
 
@@ -25,10 +25,43 @@ class OllamaInterpreterTests(unittest.TestCase):
         self.assertEqual(intent.linear_direction, LinearDirection.FORWARD)
         self.assertEqual(intent.distance_m, 0.8)
 
-    def test_text_response_is_not_executable(self) -> None:
+    def test_text_response_becomes_non_executable_conversation_reply(self) -> None:
         interpreter = OllamaInterpreter(transport=lambda _: {"message": {"content": "請說清楚"}})
+        reply = interpreter.interpret("hi")
+        self.assertEqual(reply.content, "請說清楚")
+        self.assertEqual(reply.source, "ollama")
+
+    def test_maps_read_only_status_tool_call(self) -> None:
+        interpreter = OllamaInterpreter(
+            transport=lambda _: {
+                "message": {
+                    "tool_calls": [
+                        {
+                            "function": {
+                                "name": "query_robot_pose",
+                                "arguments": {},
+                            }
+                        }
+                    ]
+                }
+            }
+        )
+        query = interpreter.interpret("它目前位於何處？")
+        self.assertEqual(query.kind, StatusKind.ROBOT_POSE)
+
+    def test_rejects_multiple_tool_calls(self) -> None:
+        interpreter = OllamaInterpreter(
+            transport=lambda _: {
+                "message": {
+                    "tool_calls": [
+                        {"function": {"name": "stop_vehicle", "arguments": {}}},
+                        {"function": {"name": "query_robot_pose", "arguments": {}}},
+                    ]
+                }
+            }
+        )
         with self.assertRaises(InterpretationError):
-            interpreter.interpret("去那裡")
+            interpreter.interpret("停下並告訴我位置")
 
 
 if __name__ == "__main__":

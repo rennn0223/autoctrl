@@ -21,6 +21,12 @@ class TurnDirection(StrEnum):
     RIGHT = "right"
 
 
+class StatusKind(StrEnum):
+    ROS_TOPICS = "ros_topics"
+    ROBOT_POSE = "robot_pose"
+    BATTERY_VOLTAGE = "battery_voltage"
+
+
 @dataclass(frozen=True, slots=True)
 class MotionIntent:
     kind: MotionKind
@@ -69,3 +75,34 @@ class MotionIntent:
 
     def to_dict(self) -> dict[str, Any]:
         return {key: value for key, value in asdict(self).items() if value is not None}
+
+
+@dataclass(frozen=True, slots=True)
+class StatusQuery:
+    kind: StatusKind
+    source: str = "unknown"
+    original_text: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "kind": self.kind,
+            "source": self.source,
+            "original_text": self.original_text,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class ConversationReply:
+    content: str
+    source: str = "unknown"
+    original_text: str = ""
+
+    def __post_init__(self) -> None:
+        if not self.content.strip():
+            raise ValueError("conversation reply cannot be empty")
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+CommandRequest = MotionIntent | StatusQuery | ConversationReply

@@ -6,7 +6,16 @@ from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
-from .domain import LinearDirection, MotionIntent, MotionKind, TurnDirection
+from .domain import (
+    CommandRequest,
+    ConversationReply,
+    LinearDirection,
+    MotionIntent,
+    MotionKind,
+    StatusKind,
+    StatusQuery,
+    TurnDirection,
+)
 
 
 class InterpretationError(RuntimeError):
@@ -30,7 +39,7 @@ class OllamaInterpreter:
         self.timeout_s = timeout_s
         self._transport = transport or self._http_transport
 
-    def interpret(self, text: str) -> MotionIntent:
+    def interpret(self, text: str) -> CommandRequest:
         payload = {
             "model": self.model,
             "stream": False,
@@ -43,7 +52,11 @@ class OllamaInterpreter:
                         "你是台灣自動化展小車的移動命令解析器。只解析使用者想要的移動，不要自行產生底盤速度。"
                         "前進或後退未指定距離代表持續移動，直到使用者說停止；此時省略 distance_m。"
                         "左轉或右轉未指定角度時省略 angle_deg，代表沿弧線持續轉彎直到使用者說停止。"
-                        "命令不清楚、互相矛盾或不是車輛移動時，不要呼叫工具，簡短說明需要澄清。"
+                        "使用者詢問 ROS topics、目前位置或電池電壓時，呼叫對應的唯讀查詢工具。"
+                        "一次只選擇一個最符合使用者主要意圖的工具。"
+                        "若只是問候或一般聊天，請簡短自然回覆，不要呼叫任何工具。"
+                        "輸入不清楚、互相矛盾，或既不是車輛移動也不是上述狀態查詢時，"
+                        "不要呼叫工具，簡短說明需要澄清。"
                     ),
                 },
                 {"role": "user", "content": text},
@@ -54,8 +67,16 @@ class OllamaInterpreter:
         message = response.get("message", {})
         calls = message.get("tool_calls") or []
         if not calls:
-            detail = str(message.get("content") or "模型沒有產生可執行命令")
-            raise InterpretationError(detail)
+            content = str(message.get("content") or "").strip()
+            if content:
+                return ConversationReply(
+                    content=content,
+                    source="ollama",
+                    original_text=text,
+                )
+            raise InterpretationError("模型既沒有產生回覆，也沒有呼叫工具")
+        if len(calls) != 1:
+            raise InterpretationError("一次只能執行一個移動命令或狀態查詢")
 
         function = calls[0].get("function", {})
         name = function.get("name")
@@ -91,8 +112,19 @@ class OllamaInterpreter:
             raise InterpretationError(f"Ollama 呼叫失敗: {exc}") from exc
 
     @staticmethod
-    def _to_intent(name: str, args: dict[str, Any], text: str) -> MotionIntent:
+    def _to_intent(name: str, args: dict[str, Any], text: str) -> CommandRequest:
         try:
+            status_tools = {
+                "query_ros_topics": StatusKind.ROS_TOPICS,
+                "query_robot_pose": StatusKind.ROBOT_POSE,
+                "query_battery_voltage": StatusKind.BATTERY_VOLTAGE,
+            }
+            if name in status_tools:
+                return StatusQuery(
+                    kind=status_tools[name],
+                    source="ollama",
+                    original_text=text,
+                )
             if name == "stop_vehicle":
                 return MotionIntent.stop(source="ollama", original_text=text)
             if name == "move_linear":
@@ -124,6 +156,30 @@ def _optional_float(values: dict[str, Any], key: str) -> float | None:
 
 
 _TOOLS: list[dict[str, Any]] = [
+    {
+        "type": "function",
+        "function": {
+            "name": "query_ros_topics",
+            "description": "唯讀查詢目前可見的 /small ROS 2 topics 與訊息型別。",
+            "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "query_robot_pose",
+            "description": "唯讀查詢小車目前在 odom 座標系中的 x、y 位置與朝向。",
+            "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "query_battery_voltage",
+            "description": "唯讀查詢小車目前回報的電池電壓；不推測未校正的電量百分比。",
+            "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
+        },
+    },
     {
         "type": "function",
         "function": {
