@@ -98,6 +98,15 @@ DGX 快速啟動會依序：
 4. 等待 `/small/cmd_vel` 與 `/small/odom`，預設最多 30 秒。
 5. 建立或同步 uv 環境並啟動 AutoCtrl CLI。
 
+所有步驟成功後，啟動輸出會自動從目前畫面隱藏，只留下 AutoCtrl
+聊天介面；如果任何步驟失敗，錯誤內容會保留。除錯時可要求保留完整輸出：
+
+```bash
+autoctrl --verbose
+```
+
+`clear` 只清除目前終端畫面，不會停止 Zenoh、ROS2 或小車 driver。
+
 若 Zenoh bridge 已經就緒，只檢查 topics 並啟動 AutoCtrl：
 
 ```bash
@@ -124,6 +133,20 @@ go right
 
 - `停` 或 `stop`：只停止小車，CLI 保持開啟。
 - `Ctrl-C`：發布零速度、停止小車並退出 CLI，不需再按 Enter。
+
+唯讀狀態查詢：
+
+```text
+現在有哪些 ROS2 topics？
+小車現在在哪裡？
+目前電壓多少？
+```
+
+- topics 查詢只列出目前 ROS graph 中可見的 `/small/*` 名稱與訊息型別。
+- 位置來自 `/small/odom`，是相對於 odom 起點的座標，不是地圖絕對位置。
+- 電池資料來自 `/small/PowerVoltage`；未建立校正曲線前只顯示伏特，不推測百分比。
+- 狀態查詢不會建立 MotionIntent，也不會發布非零速度。
+- 同一句若同時要求移動與查詢會被拒絕；明確停止命令仍維持最高優先權。
 
 ## 單獨使用文字解析器
 
@@ -159,6 +182,7 @@ go right
 | AutoCtrl 狀態輸出 | `/autoctrl/status` | `std_msgs/msg/String`（JSON） |
 | 車速輸出 | `/small/cmd_vel` | `geometry_msgs/msg/Twist` |
 | 里程計輸入 | `/small/odom` | `nav_msgs/msg/Odometry` |
+| 電池電壓輸入 | `/small/PowerVoltage` | `std_msgs/msg/Float32` |
 
 從另一個 ROS2 終端送命令：
 
@@ -219,7 +243,7 @@ set -u
 uv run python -m unittest discover -s tests -v
 ```
 
-目前鎖定版本應通過 23 項測試。
+目前版本應通過 38 項測試。
 
 ## 疑難排解
 

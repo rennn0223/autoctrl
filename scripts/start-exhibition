@@ -14,9 +14,10 @@ ROS_AUTOMATIC_DISCOVERY_RANGE="${ROS_AUTOMATIC_DISCOVERY_RANGE:-LOCALHOST}"
 TOPIC_WAIT_SECONDS="${AUTOCTRL_TOPIC_WAIT_SECONDS:-30}"
 SKIP_ROBOT=0
 SKIP_BRIDGES=0
+VERBOSE=0
 
 usage() {
-  printf '%s\n'     "用法：./scripts/start-exhibition [選項] [-- ROS2 參數]"     ""     "  --skip-robot    不透過 SSH 啟動小車 bridge 與底盤 driver"     "  --skip-bridges  不重啟兩端 bridge，只檢查 topics 後啟動 AutoCtrl"     "  --help          顯示說明"     ""     "環境變數："     "  AUTOCTRL_ROBOT_SSH          預設 wheeltec@100.64.0.5"     "  AUTOCTRL_ROBOT_ZENOH_DIR    預設 /opt/zenoh-bridge"     "  AUTOCTRL_LOCAL_ZENOH_DIR    預設 /opt/zenoh-bridge"     "  AUTOCTRL_TOPIC_WAIT_SECONDS 預設 30"     "  ROS_DOMAIN_ID               預設 2"     ""     "範例："     "  ./scripts/start-exhibition"     "  ./scripts/start-exhibition --skip-bridges"     "  ./scripts/start-exhibition -- --ros-args -p turn_linear_speed_mps:=0.30 -p angular_speed_rps:=0.50"
+  printf '%s\n'     "用法：./scripts/start-exhibition [選項] [-- ROS2 參數]"     ""     "  --skip-robot    不透過 SSH 啟動小車 bridge 與底盤 driver"     "  --skip-bridges  不重啟兩端 bridge，只檢查 topics 後啟動 AutoCtrl"     "  --verbose       啟動成功後保留完整啟動輸出"     "  --help          顯示說明"     ""     "環境變數："     "  AUTOCTRL_ROBOT_SSH          預設 wheeltec@100.64.0.5"     "  AUTOCTRL_ROBOT_ZENOH_DIR    預設 /opt/zenoh-bridge"     "  AUTOCTRL_LOCAL_ZENOH_DIR    預設 /opt/zenoh-bridge"     "  AUTOCTRL_TOPIC_WAIT_SECONDS 預設 30"     "  ROS_DOMAIN_ID               預設 2"     ""     "範例："     "  ./scripts/start-exhibition"     "  ./scripts/start-exhibition --skip-bridges"     "  ./scripts/start-exhibition --verbose"     "  ./scripts/start-exhibition -- --ros-args -p turn_linear_speed_mps:=0.30 -p angular_speed_rps:=0.50"
 }
 
 ROS_ARGS=()
@@ -28,6 +29,10 @@ while (($#)); do
       ;;
     --skip-bridges)
       SKIP_BRIDGES=1
+      shift
+      ;;
+    --verbose)
+      VERBOSE=1
       shift
       ;;
     --help|-h)
@@ -125,6 +130,13 @@ refresh_ros
 wait_for_topics
 
 "$PROJECT_DIR/scripts/bootstrap"
-echo "[5/5] 啟動 AutoCtrl；輸入中文命令，Ctrl-C 會先送零速度再退出"
-echo "建議依序測試：停 → 往前 → 停 → 後退 → 停 → 左轉 → 右轉 → 停"
+
+# Keep prompts and progress visible while setup is running.  Clear only after
+# every prerequisite has succeeded, so failures retain their full diagnostics.
+if ((VERBOSE == 0)) && [[ -t 1 ]] && [[ "${TERM:-dumb}" != "dumb" ]]; then
+  printf '\033[2J\033[H'
+else
+  echo "[5/5] 啟動 AutoCtrl；輸入中文命令，Ctrl-C 會先送零速度再退出"
+  echo "建議依序測試：停 → 往前 → 停 → 後退 → 停 → 左轉 → 右轉 → 停"
+fi
 exec "$PROJECT_DIR/scripts/autoctrl-ros" "${ROS_ARGS[@]}"

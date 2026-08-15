@@ -8,7 +8,7 @@ import threading
 from typing import Any
 
 from .console_ui import ConsoleUI
-from .domain import MotionKind
+from .domain import ConversationReply, MotionIntent, MotionKind, StatusKind, StatusQuery
 from .interpreter import HybridInterpreter
 from .motion import MotionConfig, MotionController, Pose2D, Velocity
 from .ollama import InterpretationError, OllamaInterpreter
@@ -63,7 +63,7 @@ class AutoCtrlNode:  # Constructed dynamically so importing the package does not
         from nav_msgs.msg import Odometry
         from rclpy.node import Node
         from rclpy.qos import qos_profile_sensor_data
-        from std_msgs.msg import String
+        from std_msgs.msg import Float32, String
 
         class _Node(Node):
             def __init__(self) -> None:
@@ -71,6 +71,7 @@ class AutoCtrlNode:  # Constructed dynamically so importing the package does not
                 self.declare_parameter("robot_namespace", "/small")
                 self.declare_parameter("cmd_vel_topic", "cmd_vel")
                 self.declare_parameter("odom_topic", "odom")
+                self.declare_parameter("power_voltage_topic", "PowerVoltage")
                 self.declare_parameter("command_topic", "/autoctrl/command")
                 self.declare_parameter("status_topic", "/autoctrl/status")
                 self.declare_parameter("linear_speed_mps", 0.30)
@@ -84,6 +85,10 @@ class AutoCtrlNode:  # Constructed dynamically so importing the package does not
                 namespace = str(self.get_parameter("robot_namespace").value)
                 cmd_vel_topic = _resolve_topic(namespace, str(self.get_parameter("cmd_vel_topic").value))
                 odom_topic = _resolve_topic(namespace, str(self.get_parameter("odom_topic").value))
+                power_voltage_topic = _resolve_topic(
+                    namespace,
+                    str(self.get_parameter("power_voltage_topic").value),
+                )
                 command_topic = str(self.get_parameter("command_topic").value)
                 status_topic = str(self.get_parameter("status_topic").value)
 
@@ -102,7 +107,9 @@ class AutoCtrlNode:  # Constructed dynamically so importing the package does not
                 self._interactive = bool(self.get_parameter("interactive").value)
                 self._ui = ConsoleUI() if self._interactive else None
                 self._controller = MotionController(config)
+                self._robot_namespace = f"/{namespace.strip('/')}" if namespace.strip("/") else "/"
                 self._pose: Pose2D | None = None
+                self._power_voltage: float | None = None
                 self._lock = threading.Lock()
                 self._commands: queue.Queue[tuple[str, threading.Event | None] | None] = queue.Queue()
                 self._zero_cycles = 0
@@ -110,6 +117,12 @@ class AutoCtrlNode:  # Constructed dynamically so importing the package does not
                 self._cmd_pub = self.create_publisher(Twist, cmd_vel_topic, 10)
                 self._status_pub = self.create_publisher(String, status_topic, 10)
                 self.create_subscription(Odometry, odom_topic, self._on_odom, qos_profile_sensor_data)
+                self.create_subscription(
+                    Float32,
+                    power_voltage_topic,
+                    self._on_power_voltage,
+                    qos_profile_sensor_data,
+                )
                 self.create_subscription(String, command_topic, self._on_command, 10)
                 control_hz = float(self.get_parameter("control_hz").value)
                 self.create_timer(1.0 / control_hz, self._control_tick)
@@ -153,6 +166,10 @@ class AutoCtrlNode:  # Constructed dynamically so importing the package does not
                 with self._lock:
                     self._pose = pose
 
+            def _on_power_voltage(self, message: Float32) -> None:
+                with self._lock:
+                    self._power_voltage = float(message.data)
+
             def _on_command(self, message: String) -> None:
                 self.submit_command(message.data)
 
@@ -167,16 +184,33 @@ class AutoCtrlNode:  # Constructed dynamically so importing the package does not
                         if self._interactive:
                             self._ui.show_parsing()
                         try:
-                            intent = self._interpreter.interpret(text)
-                            with self._lock:
-                                if intent.kind is MotionKind.STOP:
-                                    self._zero_cycles = 3
-                                self._controller.start(intent, self._pose)
-                            self._publish_status("accepted", intent=intent.to_dict())
-                            if self._interactive:
-                                self._ui.show_intent(intent, self._config)
+                            request = self._interpreter.interpret(text)
+                            if isinstance(request, ConversationReply):
+                                self._publish_status(
+                                    "replied",
+                                    reply=request.to_dict(),
+                                )
+                                if self._interactive:
+                                    self._ui.show_conversation_reply(request.content)
+                                else:
+                                    self.get_logger().info(
+                                        f"Replied: {request.to_dict()}"
+                                    )
+                            elif isinstance(request, StatusQuery):
+                                result = self._answer_status(request)
+                                self._publish_status(
+                                    "answered",
+                                    query=request.to_dict(),
+                                    result=result,
+                                )
+                                if self._interactive:
+                                    self._ui.show_status_result(request, result)
+                                else:
+                                    self.get_logger().info(
+                                        f"Answered: query={request.to_dict()} result={result}"
+                                    )
                             else:
-                                self.get_logger().info(f"Accepted: {intent.to_dict()}")
+                                self._accept_motion(request)
                         except (InterpretationError, ValueError) as exc:
                             self._publish_status("rejected", text=text, reason=str(exc))
                             if self._interactive:
@@ -186,6 +220,50 @@ class AutoCtrlNode:  # Constructed dynamically so importing the package does not
                     finally:
                         if completed is not None:
                             completed.set()
+
+            def _accept_motion(self, intent: MotionIntent) -> None:
+                with self._lock:
+                    if intent.kind is MotionKind.STOP:
+                        self._zero_cycles = 3
+                    self._controller.start(intent, self._pose)
+                self._publish_status("accepted", intent=intent.to_dict())
+                if self._interactive:
+                    self._ui.show_intent(intent, self._config)
+                else:
+                    self.get_logger().info(f"Accepted: {intent.to_dict()}")
+
+            def _answer_status(self, query: StatusQuery) -> dict[str, object]:
+                if query.kind is StatusKind.ROS_TOPICS:
+                    prefix = self._robot_namespace.rstrip("/") + "/"
+                    topics = [
+                        {"name": name, "types": list(types)}
+                        for name, types in sorted(self.get_topic_names_and_types())
+                        if name.startswith(prefix)
+                    ]
+                    return {"available": True, "topics": topics}
+
+                with self._lock:
+                    pose = self._pose
+                    voltage = self._power_voltage
+                if query.kind is StatusKind.ROBOT_POSE:
+                    if pose is None:
+                        return {
+                            "available": False,
+                            "reason": "尚未收到 /small/odom",
+                        }
+                    return {
+                        "available": True,
+                        "x_m": pose.x,
+                        "y_m": pose.y,
+                        "yaw_deg": math.degrees(pose.yaw),
+                        "frame": "odom",
+                    }
+                if voltage is None:
+                    return {
+                        "available": False,
+                        "reason": "尚未收到 /small/PowerVoltage",
+                    }
+                return {"available": True, "voltage_v": voltage}
 
             def _control_tick(self) -> None:
                 with self._lock:

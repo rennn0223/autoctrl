@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 
 from .console_ui import ConsoleUI
+from .domain import ConversationReply, StatusQuery
 from .interpreter import HybridInterpreter
 from .motion import MotionConfig
 from .ollama import InterpretationError, OllamaInterpreter
@@ -52,9 +53,14 @@ def _show_intent(
 ) -> None:
     ui.show_parsing()
     try:
-        intent = interpreter.interpret(text)
-        ui.show_intent(intent, config)
-    except InterpretationError as exc:
+        request = interpreter.interpret(text)
+        if isinstance(request, ConversationReply):
+            ui.show_conversation_reply(request.content)
+        elif isinstance(request, StatusQuery):
+            ui.show_status_requires_ros(request)
+        else:
+            ui.show_intent(request, config)
+    except (InterpretationError, ValueError) as exc:
         ui.show_error(str(exc))
 
 
