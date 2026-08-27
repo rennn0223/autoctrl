@@ -2,7 +2,7 @@ import unittest
 
 from autoctrl.domain import LinearDirection, MotionIntent, MotionKind, StatusKind, StatusQuery
 from autoctrl.interpreter import HybridInterpreter
-from autoctrl.status import StatusFastPathInterpreter
+from autoctrl.status import GuardedStatusFastPathInterpreter, StatusFastPathInterpreter
 
 
 class StatusFastPathTests(unittest.TestCase):
@@ -53,6 +53,29 @@ class StatusFastPathTests(unittest.TestCase):
     def test_mixed_motion_and_status_query_is_rejected(self) -> None:
         with self.assertRaises(ValueError):
             HybridInterpreter().interpret("往前走並告訴我現在的電壓")
+
+
+class GuardedStatusFastPathTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.parser = GuardedStatusFastPathInterpreter()
+
+    def test_english_pose_question_is_deterministic(self) -> None:
+        query = self.parser.interpret("Where is the robot right now?")
+        self.assertIsNotNone(query)
+        self.assertEqual(query.kind, StatusKind.ROBOT_POSE)
+
+    def test_english_mixed_status_query_is_rejected(self) -> None:
+        with self.assertRaises(ValueError):
+            self.parser.interpret("Where are you and what is the battery voltage?")
+
+    def test_chinese_mixed_status_query_is_rejected(self) -> None:
+        with self.assertRaises(ValueError):
+            self.parser.interpret("告訴我位置和電壓")
+
+    def test_default_hybrid_does_not_turn_on_right_in_pose_question(self) -> None:
+        request = HybridInterpreter().interpret("Where is the robot right now?")
+        self.assertIsInstance(request, StatusQuery)
+        self.assertEqual(request.kind, StatusKind.ROBOT_POSE)
 
 
 if __name__ == "__main__":

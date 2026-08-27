@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+PROJECT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+ROS_SETUP="${AUTOCTRL_ROS_SETUP:-/opt/ros/jazzy/setup.bash}"
+
+cd "$PROJECT_DIR"
+
+if [[ -f "$ROS_SETUP" ]]; then
+  set +u
+  # shellcheck disable=SC1090
+  source "$ROS_SETUP"
+  set -u
+fi
+
+uv sync --frozen --group dev
+uv run pytest -q
+exec uv run python scripts/evaluate.py --release "$@"

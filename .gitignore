@@ -8,3 +8,12 @@ build/
 *.egg-info/
 README.md.orig
 assets/pixpet-reference.png
+
+# Local Automation 2026 research artifacts
+/docs/AUTOMATION2026_*.md
+/evals/
+/results/
+
+# Local paper-generation helpers (not part of the public evaluator)
+/scripts/build-eval-corpus
+/scripts/generate-paper-assets

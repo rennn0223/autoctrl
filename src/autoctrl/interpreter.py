@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from .domain import CommandRequest, MotionKind, StatusKind
-from .fast_path import FastPathInterpreter
+from .fast_path import FastPathInterpreter, GuardedFastPathInterpreter
 from .ollama import OllamaInterpreter
-from .status import StatusFastPathInterpreter
+from .status import GuardedStatusFastPathInterpreter, StatusFastPathInterpreter
 
 
 class HybridInterpreter:
@@ -13,8 +13,8 @@ class HybridInterpreter:
         status_path: StatusFastPathInterpreter | None = None,
         ollama: OllamaInterpreter | None = None,
     ) -> None:
-        self.fast_path = fast_path or FastPathInterpreter()
-        self.status_path = status_path or StatusFastPathInterpreter()
+        self.fast_path = fast_path or GuardedFastPathInterpreter()
+        self.status_path = status_path or GuardedStatusFastPathInterpreter()
         self.ollama = ollama or OllamaInterpreter()
 
     def interpret(self, text: str) -> CommandRequest:

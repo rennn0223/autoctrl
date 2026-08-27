@@ -5,6 +5,16 @@ from autoctrl.ollama import InterpretationError, OllamaInterpreter
 
 
 class OllamaInterpreterTests(unittest.TestCase):
+    def test_uses_reproducible_sampling_options(self) -> None:
+        captured = {}
+
+        def transport(payload):
+            captured.update(payload)
+            return {"message": {"content": "您好"}}
+
+        OllamaInterpreter(transport=transport).interpret("你好")
+        self.assertEqual(captured["options"], {"temperature": 0.0, "seed": 42})
+
     def test_maps_tool_call_to_intent(self) -> None:
         def transport(_payload):
             return {

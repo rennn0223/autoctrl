@@ -5,9 +5,16 @@ import math
 import queue
 import sys
 import threading
+import time
 from typing import Any
 
-from .console_ui import ConsoleUI
+from .console_ui import ConsoleUI, ROS_SLASH_COMMANDS
+from .doctor import (
+    DoctorReport,
+    build_doctor_report,
+    check_ros2_environment,
+    check_zenoh_bridge,
+)
 from .domain import ConversationReply, MotionIntent, MotionKind, StatusKind, StatusQuery
 from .interpreter import HybridInterpreter
 from .motion import MotionConfig, MotionController, Pose2D, Velocity
@@ -80,6 +87,9 @@ class AutoCtrlNode:  # Constructed dynamically so importing the package does not
                 self.declare_parameter("control_hz", 20.0)
                 self.declare_parameter("model", "qwen3.6:35b")
                 self.declare_parameter("ollama_url", "http://127.0.0.1:11434")
+                self.declare_parameter("doctor_startup_delay_s", 0.0)
+                self.declare_parameter("doctor_timeout_s", 2.0)
+                self.declare_parameter("zenoh_container_name", "zenoh-bridge")
                 self.declare_parameter("interactive", True)
 
                 namespace = str(self.get_parameter("robot_namespace").value)
@@ -103,15 +113,34 @@ class AutoCtrlNode:  # Constructed dynamically so importing the package does not
                     base_url=str(self.get_parameter("ollama_url").value),
                 )
                 self._interpreter = HybridInterpreter(ollama=ollama)
+                self._ollama = ollama
                 self._config = config
                 self._interactive = bool(self.get_parameter("interactive").value)
-                self._ui = ConsoleUI() if self._interactive else None
+                self._ui = (
+                    ConsoleUI(slash_commands=ROS_SLASH_COMMANDS)
+                    if self._interactive
+                    else None
+                )
                 self._controller = MotionController(config)
                 self._robot_namespace = f"/{namespace.strip('/')}" if namespace.strip("/") else "/"
+                self._odom_topic = odom_topic
+                self._power_voltage_topic = power_voltage_topic
+                self._model = model
+                self._doctor_startup_delay_s = float(
+                    self.get_parameter("doctor_startup_delay_s").value
+                )
+                self._doctor_timeout_s = float(
+                    self.get_parameter("doctor_timeout_s").value
+                )
+                self._zenoh_container_name = str(
+                    self.get_parameter("zenoh_container_name").value
+                )
                 self._pose: Pose2D | None = None
                 self._power_voltage: float | None = None
                 self._lock = threading.Lock()
-                self._commands: queue.Queue[tuple[str, threading.Event | None] | None] = queue.Queue()
+                self._commands: queue.Queue[
+                    tuple[str, threading.Event | None, bool] | None
+                ] = queue.Queue()
                 self._zero_cycles = 0
 
                 self._cmd_pub = self.create_publisher(Twist, cmd_vel_topic, 10)
@@ -140,9 +169,11 @@ class AutoCtrlNode:  # Constructed dynamically so importing the package does not
                 self,
                 text: str,
                 completed: threading.Event | None = None,
+                *,
+                automatic: bool = False,
             ) -> None:
                 if text.strip():
-                    self._commands.put((text.strip(), completed))
+                    self._commands.put((text.strip(), completed, automatic))
 
             def stop_vehicle(self) -> None:
                 with self._lock:
@@ -173,13 +204,44 @@ class AutoCtrlNode:  # Constructed dynamically so importing the package does not
             def _on_command(self, message: String) -> None:
                 self.submit_command(message.data)
 
+            def _run_doctor(self, *, automatic: bool) -> DoctorReport:
+                report = self._doctor_report()
+                self._publish_status("doctor", result=report.to_dict())
+                if self._interactive:
+                    self._ui.show_doctor(report, automatic=automatic)
+                else:
+                    self.get_logger().info(f"Doctor: {report.to_dict()}")
+                return report
+
+            def _doctor_report(self) -> DoctorReport:
+                ros_environment_ok, ros_environment_detail = check_ros2_environment()
+                zenoh_bridge_ok, zenoh_bridge_detail = check_zenoh_bridge(
+                    container_name=self._zenoh_container_name,
+                    timeout_s=self._doctor_timeout_s,
+                )
+                model_ok, model_detail = self._ollama.check_ready(
+                    timeout_s=self._doctor_timeout_s
+                )
+                return build_doctor_report(
+                    ros_environment_ok=ros_environment_ok,
+                    ros_environment_detail=ros_environment_detail,
+                    zenoh_bridge_ok=zenoh_bridge_ok,
+                    zenoh_bridge_detail=zenoh_bridge_detail,
+                    model=self._model,
+                    model_ok=model_ok,
+                    model_detail=model_detail,
+                )
+
             def _command_worker(self) -> None:
                 while rclpy.ok():
                     item = self._commands.get()
                     if item is None:
                         return
-                    text, completed = item
+                    text, completed, automatic = item
                     try:
+                        if text.lower() == "/doctor":
+                            self._run_doctor(automatic=automatic)
+                            continue
                         self._publish_status("parsing", text=text)
                         if self._interactive:
                             self._ui.show_parsing()
@@ -240,7 +302,11 @@ class AutoCtrlNode:  # Constructed dynamically so importing the package does not
                         for name, types in sorted(self.get_topic_names_and_types())
                         if name.startswith(prefix)
                     ]
-                    return {"available": True, "topics": topics}
+                    return {
+                        "available": True,
+                        "namespace": self._robot_namespace,
+                        "topics": topics,
+                    }
 
                 with self._lock:
                     pose = self._pose
@@ -249,7 +315,7 @@ class AutoCtrlNode:  # Constructed dynamically so importing the package does not
                     if pose is None:
                         return {
                             "available": False,
-                            "reason": "尚未收到 /small/odom",
+                            "reason": f"尚未收到 {self._odom_topic}",
                         }
                     return {
                         "available": True,
@@ -261,7 +327,7 @@ class AutoCtrlNode:  # Constructed dynamically so importing the package does not
                 if voltage is None:
                     return {
                         "available": False,
-                        "reason": "尚未收到 /small/PowerVoltage",
+                        "reason": f"尚未收到 {self._power_voltage_topic}",
                     }
                 return {"available": True, "voltage_v": voltage}
 
@@ -298,12 +364,20 @@ class AutoCtrlNode:  # Constructed dynamically so importing the package does not
                 return self._interactive
 
             def run_interactive(self) -> None:
+                if self._doctor_startup_delay_s > 0:
+                    time.sleep(self._doctor_startup_delay_s)
+                self._run_doctor(automatic=True)
                 while rclpy.ok():
                     try:
                         text = self._ui.prompt()
                     except EOFError:
                         return
                     if text:
+                        if text.lower() == "/exit":
+                            self._publish_status("exiting")
+                            self.stop_vehicle()
+                            self._ui.show_goodbye()
+                            return
                         completed = threading.Event()
                         self.submit_command(text, completed)
                         while rclpy.ok() and not completed.wait(timeout=0.1):

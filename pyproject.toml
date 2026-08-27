@@ -5,15 +5,19 @@ description = "Natural-language ROS2 vehicle control for Automation 2026"
 readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.12,<3.13"
-dependencies = ["rich>=13,<15"]
+dependencies = ["prompt-toolkit>=3.0,<4", "rich>=13,<15"]
 
 [project.scripts]
 autoctrl = "autoctrl.cli:main"
+autoctrl-eval = "autoctrl.evaluation:main"
 autoctrl-ros = "autoctrl.ros_node:main"
 
 [build-system]
 requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
+
+[dependency-groups]
+dev = ["pytest>=8,<9"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

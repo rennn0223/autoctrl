@@ -11,9 +11,46 @@
 - 本地模型：Ollama `qwen3.6:35b`
 - ROS domain：`2`
 - Zenoh bridge：DGX 與小車皆位於 `/opt/zenoh-bridge`
-- 小車 namespace：`/small`
+- 小車 namespace：預設 `/small`，可依實際 ROS2／Zenoh 部署調整
 
 ## 第一次設定
+
+### curl 一鍵安裝
+
+在已具備 ROS2 Jazzy 的 DGX Spark 上，可用下列指令下載專案、建立 uv 隔離環境，
+並在 `~/.local/bin/autoctrl` 建立啟動指令：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/rennn0223/autoctrl/main/install.sh | bash
+```
+
+這個安裝器不會自動安裝或修改 ROS2、Docker、Zenoh bridge 與 Ollama 系統服務；
+它只安裝 uv（尚未存在時）、AutoCtrl 專案環境與使用者層級啟動連結。
+
+> **重要：一鍵安裝不包含機器人通訊設定。** 使用者必須自行準備 DGX 與機器人
+> 兩端的 ROS2 環境及 Zenoh bridge，並確認 ROS domain、Zenoh endpoint／routing、
+> topic allow list、namespace 與訊息型別一致。namespace 不必是 `/small`；它只是
+> AutoCtrl 的預設值，改用其他 namespace 時也必須同步修改 bridge 規則與
+> `robot_namespace` 參數。
+
+因為 `curl | bash` 會直接執行遠端程式碼，正式環境可先下載並檢查內容：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/rennn0223/autoctrl/main/install.sh \
+  -o /tmp/autoctrl-install.sh
+less /tmp/autoctrl-install.sh
+bash /tmp/autoctrl-install.sh
+```
+
+可用環境變數調整安裝位置或 ROS2 setup：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/rennn0223/autoctrl/main/install.sh | \
+  AUTOCTRL_INSTALL_DIR=/home/nvidia/autoctrl \
+  AUTOCTRL_ROS_SETUP=/opt/ros/jazzy/setup.bash bash
+```
+
+### 手動設定
 
 在 DGX Spark 進入專案並建立 uv 隔離環境：
 
@@ -90,16 +127,14 @@ cd /home/nvidia/autoctrl
 autoctrl
 ```
 
-DGX 快速啟動會依序：
+DGX 快速啟動會以靜默方式確認 loopback multicast、重啟 DGX Zenoh bridge、
+載入 ROS2 Jazzy、重整 ROS discovery、同步 uv 環境並進入 AutoCtrl CLI。
+啟動時不等待小車 topics，因此小車尚未開啟或部分狀態缺失時仍可使用 CLI。
 
-1. 確認 loopback multicast；已啟用時不要求 `sudo` 密碼。
-2. 使用目前帳號的 Docker 群組權限重啟 DGX Zenoh bridge。
-3. 載入 ROS2 Jazzy 並重整 ROS discovery。
-4. 等待 `/small/cmd_vel` 與 `/small/odom`，預設最多 30 秒。
-5. 建立或同步 uv 環境並啟動 AutoCtrl CLI。
-
-所有步驟成功後，啟動輸出會自動從目前畫面隱藏，只留下 AutoCtrl
-聊天介面；如果任何步驟失敗，錯誤內容會保留。除錯時可要求保留完整輸出：
+AutoCtrl 進入聊天介面後會自動執行一次 `/doctor`。全部通過時不顯示額外訊息；
+只有失敗項目會列出，而且不會關閉程式。任何時候都能手動輸入 `/doctor` 重新檢查。
+一般啟動不再顯示逐步狀態；完整紀錄保存在 `/tmp/autoctrl-startup.log`。
+除錯時可要求在終端保留完整輸出：
 
 ```bash
 autoctrl --verbose
@@ -107,7 +142,7 @@ autoctrl --verbose
 
 `clear` 只清除目前終端畫面，不會停止 Zenoh、ROS2 或小車 driver。
 
-若 Zenoh bridge 已經就緒，只檢查 topics 並啟動 AutoCtrl：
+若 Zenoh bridge 已經就緒，可略過 bridge 重啟並直接啟動 AutoCtrl：
 
 ```bash
 ./scripts/start-dgx --skip-bridges
@@ -132,7 +167,32 @@ go right
 ```
 
 - `停` 或 `stop`：只停止小車，CLI 保持開啟。
+- `/exit`：發布零速度、停止小車並離開 CLI。
 - `Ctrl-C`：發布零速度、停止小車並退出 CLI，不需再按 Enter。
+
+輸入 `/` 會顯示 slash 指令選單：選單開啟時以方向鍵上、下選擇，按 Enter
+執行；沒有開啟選單時，方向鍵上、下會瀏覽本次執行期間的歷史命令。
+
+系統檢查：
+
+```text
+/doctor
+```
+
+`/doctor` 只檢查三項：ROS2 環境是否已 source、DGX 的 `zenoh-bridge`
+Docker 容器是否為 `running`（若有 healthcheck 也必須為 `healthy`），以及本地
+Ollama 模型是否能回應。小車 driver、`/small/*` topics、odom 與電池資料都不影響
+Doctor 成敗；任何檢查失敗也不會阻止 CLI 開啟。
+
+`/doctor` 的 Zenoh 項目只確認 **DGX 本機 `zenoh-bridge` 容器狀態**，不代表
+DGX 到機器人的端到端路由或 topics 已經打通。展場控制前仍必須另外執行：
+
+```bash
+ros2 topic list
+ros2 topic info /small/cmd_vel --verbose
+```
+
+使用其他 namespace 時，將 `/small/cmd_vel` 換成實際控制 topic。
 
 唯讀狀態查詢：
 
@@ -142,9 +202,9 @@ go right
 目前電壓多少？
 ```
 
-- topics 查詢只列出目前 ROS graph 中可見的 `/small/*` 名稱與訊息型別。
-- 位置來自 `/small/odom`，是相對於 odom 起點的座標，不是地圖絕對位置。
-- 電池資料來自 `/small/PowerVoltage`；未建立校正曲線前只顯示伏特，不推測百分比。
+- topics 查詢只列出目前 ROS graph 中可見的 `<robot_namespace>/*` 名稱與訊息型別。
+- 位置預設來自 `/small/odom`，是相對於 odom 起點的座標，不是地圖絕對位置。
+- 電池資料預設來自 `/small/PowerVoltage`；未建立校正曲線前只顯示伏特，不推測百分比。
 - 狀態查詢不會建立 MotionIntent，也不會發布非零速度。
 - 同一句若同時要求移動與查詢會被拒絕；明確停止命令仍維持最高優先權。
 
@@ -184,6 +244,11 @@ go right
 | 里程計輸入 | `/small/odom` | `nav_msgs/msg/Odometry` |
 | 電池電壓輸入 | `/small/PowerVoltage` | `std_msgs/msg/Float32` |
 
+上表只是預設值。若車輛使用 `/robot_a`、`/amr` 或其他 namespace，不需要改原始碼；
+啟動時指定 `robot_namespace` 即可。Zenoh bridge 必須允許相同 namespace 的 topics，
+且底盤控制 topic 仍須為 `geometry_msgs/msg/Twist`。`odom` 是指定距離／角度及位置
+查詢所需資料，`PowerVoltage` 則只影響電壓查詢。
+
 從另一個 ROS2 終端送命令：
 
 ```bash
@@ -210,7 +275,7 @@ ros2 topic pub --once /autoctrl/command std_msgs/msg/String "{data: '停'}"
 
 ```bash
 ./scripts/autoctrl-ros --ros-args \
-  -p robot_namespace:=/small \
+  -p robot_namespace:=/robot_a \
   -p linear_speed_mps:=0.30 \
   -p turn_linear_speed_mps:=0.30 \
   -p angular_speed_rps:=0.50
@@ -228,7 +293,7 @@ ros2 topic pub --once /autoctrl/command std_msgs/msg/String "{data: '停'}"
 |---|---|---|
 | `AUTOCTRL_ROS_SETUP` | `/opt/ros/jazzy/setup.bash` | ROS2 環境檔 |
 | `AUTOCTRL_LOCAL_ZENOH_DIR` | `/opt/zenoh-bridge` | DGX Zenoh bridge 目錄 |
-| `AUTOCTRL_TOPIC_WAIT_SECONDS` | `30` | 等待 ROS2 topics 的秒數 |
+| `AUTOCTRL_STARTUP_LOG` | `/tmp/autoctrl-startup.log` | 靜默啟動的完整紀錄 |
 | `ROS_DOMAIN_ID` | `2` | ROS2 domain |
 | `ROS_AUTOMATIC_DISCOVERY_RANGE` | `LOCALHOST` | DDS discovery 範圍 |
 
@@ -240,10 +305,10 @@ ros2 topic pub --once /autoctrl/command std_msgs/msg/String "{data: '停'}"
 set +u
 source /opt/ros/jazzy/setup.bash
 set -u
-uv run python -m unittest discover -s tests -v
+uv run --with pytest pytest -q
 ```
 
-目前版本應通過 38 項測試。
+目前版本應通過 58 項測試與 4 個 subtests。論文用 parser-only 評估另見 `evals/README.md`；它不會載入 ROS 或發布 `/cmd_vel`。
 
 ## 疑難排解
 
@@ -255,7 +320,7 @@ uv run python -m unittest discover -s tests -v
 ./scripts/bootstrap
 ```
 
-### 等不到 `/small/cmd_vel` 或 `/small/odom`
+### `/doctor` 顯示 ROS2、Zenoh bridge 或本地模型檢查失敗
 
 確認 DGX Zenoh bridge：
 

@@ -11,13 +11,22 @@ LOCAL_ZENOH_DIR="${AUTOCTRL_LOCAL_ZENOH_DIR:-/opt/zenoh-bridge}"
 ROS_SETUP="${AUTOCTRL_ROS_SETUP:-/opt/ros/jazzy/setup.bash}"
 ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-2}"
 ROS_AUTOMATIC_DISCOVERY_RANGE="${ROS_AUTOMATIC_DISCOVERY_RANGE:-LOCALHOST}"
-TOPIC_WAIT_SECONDS="${AUTOCTRL_TOPIC_WAIT_SECONDS:-30}"
+STARTUP_LOG="${AUTOCTRL_STARTUP_LOG:-/tmp/autoctrl-startup.log}"
 SKIP_ROBOT=0
 SKIP_BRIDGES=0
 VERBOSE=0
 
 usage() {
-  printf '%s\n'     "用法：./scripts/start-exhibition [選項] [-- ROS2 參數]"     ""     "  --skip-robot    不透過 SSH 啟動小車 bridge 與底盤 driver"     "  --skip-bridges  不重啟兩端 bridge，只檢查 topics 後啟動 AutoCtrl"     "  --verbose       啟動成功後保留完整啟動輸出"     "  --help          顯示說明"     ""     "環境變數："     "  AUTOCTRL_ROBOT_SSH          預設 wheeltec@100.64.0.5"     "  AUTOCTRL_ROBOT_ZENOH_DIR    預設 /opt/zenoh-bridge"     "  AUTOCTRL_LOCAL_ZENOH_DIR    預設 /opt/zenoh-bridge"     "  AUTOCTRL_TOPIC_WAIT_SECONDS 預設 30"     "  ROS_DOMAIN_ID               預設 2"     ""     "範例："     "  ./scripts/start-exhibition"     "  ./scripts/start-exhibition --skip-bridges"     "  ./scripts/start-exhibition --verbose"     "  ./scripts/start-exhibition -- --ros-args -p turn_linear_speed_mps:=0.30 -p angular_speed_rps:=0.50"
+  printf '%s\n' \
+    "用法：./scripts/start-exhibition [選項] [-- ROS2 參數]" \
+    "" \
+    "  --skip-robot    不透過 SSH 啟動小車 bridge 與底盤 driver" \
+    "  --skip-bridges  不重啟兩端 bridge，直接啟動 AutoCtrl" \
+    "  --verbose       顯示 bridge、ROS discovery 與 uv 的完整啟動輸出" \
+    "  --help          顯示說明" \
+    "" \
+    "一般啟動不等待小車 topics；CLI 會自動執行 /doctor，且失敗不阻止開啟。" \
+    "完整啟動紀錄預設寫入：$STARTUP_LOG"
 }
 
 ROS_ARGS=()
@@ -58,85 +67,91 @@ if [[ ! -f "$ROS_SETUP" ]]; then
 fi
 
 export ROS_DOMAIN_ID ROS_AUTOMATIC_DISCOVERY_RANGE
+set +u
+source "$ROS_SETUP"
+set -u
+
+: >"$STARTUP_LOG"
+STARTUP_WARNINGS=()
+
+verbose() {
+  if ((VERBOSE)); then
+    printf '• %s\n' "$1"
+  fi
+}
+
+remember_warning() {
+  STARTUP_WARNINGS+=("$1")
+  if ((VERBOSE)); then
+    printf 'FAIL %s\n' "$1" >&2
+  fi
+}
+
+run_optional() {
+  local label="$1"
+  shift
+  verbose "$label"
+  if ((VERBOSE)); then
+    if ! "$@"; then
+      remember_warning "$label 失敗；詳見 $STARTUP_LOG"
+    fi
+  elif ! "$@" >>"$STARTUP_LOG" 2>&1; then
+    remember_warning "$label 失敗；詳見 $STARTUP_LOG"
+  fi
+}
 
 start_robot() {
-  echo "[1/5] 啟動小車 zenoh bridge 與 WHEELTEC 底盤 driver：$ROBOT_SSH"
-  ssh -tt "$ROBOT_SSH"     "export ROS_AUTOMATIC_DISCOVERY_RANGE='$ROS_AUTOMATIC_DISCOVERY_RANGE' ROS_DOMAIN_ID='$ROS_DOMAIN_ID'; sudo ip link set lo multicast on; cd '$ROBOT_ZENOH_DIR'; sudo docker compose down; sudo docker compose up -d; if pgrep -f '[r]os2 launch turn_on_wheeltec_robot turn_on_wheeltec_robot.launch.py' >/dev/null; then   echo 'WHEELTEC driver 已經在執行'; else   nohup zsh -lic \"export ROS_AUTOMATIC_DISCOVERY_RANGE='$ROS_AUTOMATIC_DISCOVERY_RANGE'; export ROS_DOMAIN_ID='$ROS_DOMAIN_ID'; ros2 launch turn_on_wheeltec_robot turn_on_wheeltec_robot.launch.py\"     >/tmp/autoctrl-wheeltec-driver.log 2>&1 </dev/null &   sleep 3;   pgrep -af '[r]os2 launch turn_on_wheeltec_robot' || { echo '底盤 driver 啟動失敗，請查看 /tmp/autoctrl-wheeltec-driver.log' >&2; exit 1; }; fi"
+  ssh -tt "$ROBOT_SSH" \
+    "export ROS_AUTOMATIC_DISCOVERY_RANGE='$ROS_AUTOMATIC_DISCOVERY_RANGE' ROS_DOMAIN_ID='$ROS_DOMAIN_ID'; sudo ip link set lo multicast on; cd '$ROBOT_ZENOH_DIR'; sudo docker compose down; sudo docker compose up -d; if pgrep -f '[r]os2 launch turn_on_wheeltec_robot turn_on_wheeltec_robot.launch.py' >/dev/null; then echo 'WHEELTEC driver 已經在執行'; else nohup zsh -lic \"export ROS_AUTOMATIC_DISCOVERY_RANGE='$ROS_AUTOMATIC_DISCOVERY_RANGE'; export ROS_DOMAIN_ID='$ROS_DOMAIN_ID'; ros2 launch turn_on_wheeltec_robot turn_on_wheeltec_robot.launch.py\" >/tmp/autoctrl-wheeltec-driver.log 2>&1 </dev/null & sleep 3; pgrep -af '[r]os2 launch turn_on_wheeltec_robot' || exit 1; fi"
 }
 
 start_local_bridge() {
-  echo "[2/5] 啟動 DGX zenoh bridge"
   if ! ip link show lo | grep -qw MULTICAST; then
-    echo "需要啟用 loopback multicast（通常只需設定一次）"
     sudo ip link set lo multicast on
   fi
-  if [[ ! -d "$LOCAL_ZENOH_DIR" ]]; then
-    echo "找不到 DGX zenoh bridge 目錄：$LOCAL_ZENOH_DIR" >&2
-    exit 1
-  fi
+  [[ -d "$LOCAL_ZENOH_DIR" ]] || return 1
   (
     cd "$LOCAL_ZENOH_DIR"
     docker compose down
     docker compose up -d
-    docker compose ps
   )
 }
 
 refresh_ros() {
-  echo "[3/5] 載入 ROS2 Jazzy 並重整 discovery"
-  set +u
-  source "$ROS_SETUP"
-  set -u
   ros2 daemon stop >/dev/null 2>&1 || true
   ros2 daemon start >/dev/null
 }
 
-wait_for_topics() {
-  echo "[4/5] 等待 /small/cmd_vel 與 /small/odom（最多 ${TOPIC_WAIT_SECONDS} 秒）"
-  local deadline=$((SECONDS + TOPIC_WAIT_SECONDS))
-  local topics
-  while ((SECONDS < deadline)); do
-    topics="$(ros2 topic list 2>/dev/null || true)"
-    if grep -Fxq '/small/cmd_vel' <<<"$topics" && grep -Fxq '/small/odom' <<<"$topics"; then
-      echo "ROS2 topics 已就緒："
-      printf '  /small/cmd_vel: %s\n' "$(ros2 topic type /small/cmd_vel)"
-      printf '  /small/odom: %s\n' "$(ros2 topic type /small/odom)"
-      return 0
-    fi
-    sleep 1
-  done
-
-  echo "等待逾時。目前 /small topics：" >&2
-  ros2 topic list 2>/dev/null | grep '^/small/' >&2 || true
-  echo "請檢查：" >&2
-  echo "  DGX：cd '$LOCAL_ZENOH_DIR' && sudo docker compose logs --tail=100" >&2
-  echo "  小車：ssh '$ROBOT_SSH' tail -n 100 /tmp/autoctrl-wheeltec-driver.log" >&2
-  return 1
-}
-
 if ((SKIP_BRIDGES == 0)); then
   if ((SKIP_ROBOT == 0)); then
-    start_robot
+    run_optional "啟動小車 Zenoh bridge 與底盤 driver" start_robot
   else
-    echo "[1/5] 略過小車啟動"
+    verbose "略過小車啟動"
   fi
-  start_local_bridge
+  run_optional "啟動 DGX Zenoh bridge" start_local_bridge
 else
-  echo "[1/5] 略過小車啟動"
-  echo "[2/5] 略過兩端 zenoh bridge 重啟"
+  verbose "略過兩端 Zenoh bridge 重啟"
 fi
 
-refresh_ros
-wait_for_topics
+run_optional "重整 ROS 2 discovery" refresh_ros
 
-"$PROJECT_DIR/scripts/bootstrap"
-
-# Keep prompts and progress visible while setup is running.  Clear only after
-# every prerequisite has succeeded, so failures retain their full diagnostics.
-if ((VERBOSE == 0)) && [[ -t 1 ]] && [[ "${TERM:-dumb}" != "dumb" ]]; then
-  printf '\033[2J\033[H'
-else
-  echo "[5/5] 啟動 AutoCtrl；輸入中文命令，Ctrl-C 會先送零速度再退出"
-  echo "建議依序測試：停 → 往前 → 停 → 後退 → 停 → 左轉 → 右轉 → 停"
+verbose "同步 uv 環境"
+if ((VERBOSE)); then
+  if ! "$PROJECT_DIR/scripts/bootstrap"; then
+    echo "AutoCtrl uv 環境初始化失敗。" >&2
+    exit 1
+  fi
+elif ! "$PROJECT_DIR/scripts/bootstrap" >>"$STARTUP_LOG" 2>&1; then
+  echo "AutoCtrl uv 環境初始化失敗；詳見 $STARTUP_LOG" >&2
+  tail -n 20 "$STARTUP_LOG" >&2
+  exit 1
 fi
+
+if ((${#STARTUP_WARNINGS[@]})); then
+  printf -v AUTOCTRL_STARTUP_WARNINGS '%s\n' "${STARTUP_WARNINGS[@]}"
+  export AUTOCTRL_STARTUP_WARNINGS
+else
+  unset AUTOCTRL_STARTUP_WARNINGS || true
+fi
+
 exec "$PROJECT_DIR/scripts/autoctrl-ros" "${ROS_ARGS[@]}"

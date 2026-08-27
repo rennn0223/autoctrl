@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import argparse
 
-from .console_ui import ConsoleUI
+from .console_ui import ConsoleUI, EXIT_SLASH_COMMANDS
 from .domain import ConversationReply, StatusQuery
 from .interpreter import HybridInterpreter
 from .motion import MotionConfig
@@ -20,7 +20,7 @@ def _parser() -> argparse.ArgumentParser:
 
 def main() -> None:
     args = _parser().parse_args()
-    ui = ConsoleUI()
+    ui = ConsoleUI(slash_commands=EXIT_SLASH_COMMANDS)
     ollama = OllamaInterpreter(model=args.model, base_url=args.ollama_url)
     if args.warmup:
         ui.show_warmup(args.model)
@@ -39,6 +39,9 @@ def main() -> None:
         try:
             text = ui.prompt()
         except (EOFError, KeyboardInterrupt):
+            ui.show_goodbye()
+            return
+        if text.lower() == "/exit":
             ui.show_goodbye()
             return
         if text:

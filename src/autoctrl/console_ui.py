@@ -1,8 +1,18 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+import sys
 import threading
 import time
 
+from prompt_toolkit import PromptSession
+from prompt_toolkit.completion import CompleteEvent, Completer, Completion
+from prompt_toolkit.document import Document
+from prompt_toolkit.history import InMemoryHistory
+from prompt_toolkit.key_binding import KeyBindings
+from prompt_toolkit.patch_stdout import patch_stdout
+from prompt_toolkit.shortcuts import CompleteStyle
+from prompt_toolkit.styles import Style
 from rich.align import Align
 from rich.console import Console, Group
 from rich.live import Live
@@ -11,6 +21,7 @@ from rich.status import Status
 from rich.table import Table
 from rich.text import Text
 
+from .doctor import DoctorReport
 from .domain import (
     LinearDirection,
     MotionIntent,
@@ -38,6 +49,97 @@ _AUTOCTRL_BANNER = tuple(
 )
 
 
+@dataclass(frozen=True, slots=True)
+class SlashCommand:
+    name: str
+    description: str
+
+
+EXIT_SLASH_COMMANDS = (
+    SlashCommand("/exit", "安全停止並離開"),
+)
+ROS_SLASH_COMMANDS = (
+    SlashCommand("/doctor", "檢查模型與 ROS2 狀態"),
+    *EXIT_SLASH_COMMANDS,
+)
+
+
+class SlashCommandCompleter(Completer):
+    def __init__(self, commands: tuple[SlashCommand, ...]) -> None:
+        self._commands = commands
+
+    def get_completions(
+        self,
+        document: Document,
+        complete_event: CompleteEvent,
+    ):
+        del complete_event
+        text = document.text_before_cursor
+        if not text.startswith("/") or any(character.isspace() for character in text):
+            return
+        prefix = text.lower()
+        for command in self._commands:
+            if command.name.startswith(prefix):
+                yield Completion(
+                    command.name,
+                    start_position=-len(text),
+                    display=command.name,
+                    display_meta=command.description,
+                )
+
+
+def _input_key_bindings() -> KeyBindings:
+    bindings = KeyBindings()
+
+    @bindings.add("/")
+    def _slash(event) -> None:
+        buffer = event.current_buffer
+        buffer.insert_text("/")
+        if buffer.document.text_before_cursor == "/":
+            buffer.start_completion(select_first=False)
+
+    @bindings.add("up")
+    def _up(event) -> None:
+        buffer = event.current_buffer
+        if buffer.complete_state is not None:
+            buffer.complete_previous()
+        else:
+            buffer.history_backward()
+
+    @bindings.add("down")
+    def _down(event) -> None:
+        buffer = event.current_buffer
+        if buffer.complete_state is not None:
+            buffer.complete_next()
+        else:
+            buffer.history_forward()
+
+    @bindings.add("enter", eager=True)
+    def _enter(event) -> None:
+        buffer = event.current_buffer
+        if buffer.complete_state is not None:
+            completion = buffer.complete_state.current_completion
+            if completion is None:
+                buffer.complete_next()
+                completion = buffer.complete_state.current_completion
+            if completion is not None:
+                buffer.apply_completion(completion)
+        buffer.validate_and_handle()
+
+    return bindings
+
+
+_INPUT_STYLE = Style.from_dict(
+    {
+        "prompt": "bold #32c5d2",
+        "completion-menu.completion": "bg:#262626 #d0d0d0",
+        "completion-menu.completion.current": "bg:#3a3a3a #32c5d2 bold",
+        "completion-menu.meta.completion": "bg:#262626 #888888",
+        "completion-menu.meta.completion.current": "bg:#3a3a3a #d0d0d0",
+    }
+)
+
+
 class ConsoleUI:
     """只負責終端顯示，不包含任何車輛控制邏輯。"""
 
@@ -46,6 +148,7 @@ class ConsoleUI:
         console: Console | None = None,
         *,
         typing_delay_s: float | None = None,
+        slash_commands: tuple[SlashCommand, ...] = (),
     ) -> None:
         self.console = console or Console(
             highlight=False,
@@ -58,6 +161,20 @@ class ConsoleUI:
         )
         self._activity: Status | None = None
         self._lock = threading.Lock()
+        self._slash_commands = slash_commands
+        self._prompt_session: PromptSession[str] | None = None
+        if self.console.is_terminal and sys.stdin.isatty():
+            self._prompt_session = PromptSession(
+                history=InMemoryHistory(),
+                completer=SlashCommandCompleter(slash_commands),
+                complete_while_typing=True,
+                complete_style=CompleteStyle.COLUMN,
+                reserve_space_for_menu=max(4, len(slash_commands) + 2),
+                key_bindings=_input_key_bindings(),
+                erase_when_done=True,
+                style=_INPUT_STYLE,
+                include_default_pygments_style=False,
+            )
 
     def show_header(self, *, model: str, cmd_vel_topic: str | None = None) -> None:
         rows = [
@@ -66,7 +183,7 @@ class ConsoleUI:
             *(Text(line, style="bold cyan") for line in _AUTOCTRL_BANNER),
             Text(""),
             Text.assemble(("模型      ", "dim"), model),
-            Text.assemble(("ROS2      ", "dim"), "已連線", ("  ✓", "green")),
+            Text.assemble(("ROS2      ", "dim"), "節點已啟動"),
         ]
         if cmd_vel_topic:
             rows.append(Text.assemble(("控制目標  ", "dim"), cmd_vel_topic))
@@ -94,14 +211,25 @@ class ConsoleUI:
             )
         )
         self.console.print("  [dim]輸入自然語言控制小車，或查詢 ROS topics、目前位置與電池電壓。[/dim]")
-        self.console.print("  [dim]Ctrl-C[/dim] [grey50]安全停止並離開[/grey50]")
+        hints = [
+            f"[dim]{command.name}[/dim] [grey50]{command.description}[/grey50]"
+            for command in self._slash_commands
+        ]
+        hints.append("[dim]Ctrl-C[/dim] [grey50]安全停止並離開[/grey50]")
+        self.console.print("  " + "  ·  ".join(hints))
         self.console.print()
 
     def prompt(self) -> str:
-        text = self.console.input("[bold cyan]›[/bold cyan] ").strip()
+        if self._prompt_session is not None:
+            with patch_stdout(raw=True):
+                text = self._prompt_session.prompt(
+                    [("class:prompt", "› ")],
+                ).strip()
+        else:
+            text = self.console.input("[bold cyan]›[/bold cyan] ").strip()
         if text:
             # Replace the raw input line with a stable conversation card.
-            if self.console.is_terminal:
+            if self.console.is_terminal and self._prompt_session is None:
                 self.console.file.write("\x1b[1A\r\x1b[2K")
                 self.console.file.flush()
             self.show_user_message(text)
@@ -177,8 +305,9 @@ class ConsoleUI:
             return
 
         topics = result.get("topics", [])
+        namespace = str(result.get("namespace", "機器人 namespace"))
         segments: list[tuple[str, str]] = [
-            (f"目前可見 {len(topics)} 個 /small topics。", "bold")
+            (f"目前可見 {len(topics)} 個 {namespace} topics。", "bold")
         ]
         for item in topics:
             segments.append(
@@ -206,6 +335,36 @@ class ConsoleUI:
     def show_conversation_reply(self, content: str) -> None:
         self._stop_activity()
         self._stream_assistant([(content, "white")])
+
+    def show_doctor(self, report: DoctorReport, *, automatic: bool = False) -> None:
+        self._stop_activity()
+        failures = report.failures
+        if automatic and not failures:
+            return
+
+        visible_checks = failures if automatic else report.checks
+        if failures:
+            segments: list[tuple[str, str]] = [
+                (f"Doctor · {len(failures)} fail", "bold yellow")
+            ]
+        else:
+            segments = [("Doctor · all checks passed", "bold green")]
+
+        for check in visible_checks:
+            marker = "✓" if check.ok else "✗"
+            style = "green" if check.ok else "yellow"
+            segments.extend(
+                [
+                    (f"\n{marker} {check.label}", style),
+                    (f"  {check.detail}", "grey70"),
+                ]
+            )
+        if automatic and failures:
+            segments.append(("\n輸入 /doctor 可重新檢查。", "grey50"))
+        self._stream_assistant(
+            segments,
+            border_style="yellow" if failures else "green",
+        )
 
     def show_error(self, message: str) -> None:
         self._stop_activity()

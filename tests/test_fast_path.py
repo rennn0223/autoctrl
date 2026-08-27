@@ -1,7 +1,7 @@
 import unittest
 
 from autoctrl.domain import LinearDirection, MotionKind, TurnDirection
-from autoctrl.fast_path import FastPathInterpreter
+from autoctrl.fast_path import FastPathInterpreter, GuardedFastPathInterpreter
 
 
 class FastPathTests(unittest.TestCase):
@@ -64,6 +64,37 @@ class FastPathTests(unittest.TestCase):
 
     def test_conflicting_directions_fall_through(self) -> None:
         self.assertIsNone(self.parser.interpret("前進再後退"))
+
+
+class GuardedFastPathTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.parser = GuardedFastPathInterpreter()
+
+    def test_negated_motion_becomes_stop(self) -> None:
+        intent = self.parser.interpret("先別再前進了")
+        self.assertIsNotNone(intent)
+        self.assertEqual(intent.kind, MotionKind.STOP)
+        self.assertEqual(intent.source, "guarded_fast_path")
+
+    def test_negated_stop_falls_through(self) -> None:
+        self.assertIsNone(self.parser.interpret("不要停"))
+
+    def test_question_containing_right_falls_through(self) -> None:
+        self.assertIsNone(self.parser.interpret("Where is the robot right now?"))
+
+    def test_unparsed_measurement_falls_through(self) -> None:
+        self.assertIsNone(self.parser.interpret("往前挪半公尺"))
+        self.assertIsNone(self.parser.interpret("swing right by ninety degrees"))
+
+    def test_semantic_direction_conflict_falls_through(self) -> None:
+        self.assertIsNone(self.parser.interpret("向左打方向前進"))
+
+    def test_canonical_commands_keep_the_deterministic_path(self) -> None:
+        intent = self.parser.interpret("往前 50 公分")
+        self.assertIsNotNone(intent)
+        self.assertEqual(intent.kind, MotionKind.MOVE_LINEAR)
+        self.assertAlmostEqual(intent.distance_m, 0.5)
+        self.assertEqual(intent.source, "guarded_fast_path")
 
 
 if __name__ == "__main__":

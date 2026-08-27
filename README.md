@@ -14,7 +14,11 @@ AutoCtrl 在 NVIDIA DGX Spark 上執行，透過 ROS2 與 Zenoh bridge 控制 WH
 - 未指定距離或角度時持續移動，直到收到停止命令
 - 支援阿克曼轉向、指定距離與指定角度
 - Codex 風格繁體中文 CLI 與高保真 PixPet 啟動畫面
+- 啟動時自動執行 `/doctor`；小車尚未開啟仍可進入 CLI，並可隨時手動重查
+- 輸入 `/` 可用上下鍵選擇 slash 指令，平常可用上下鍵叫回歷史命令
+- 支援 `/exit` 發布零速度並安全離開 CLI
 - 單按 `Ctrl-C` 發布零速度並安全退出
+- 機器人 namespace 預設為 `/small`，可透過 ROS2 parameters 配合其他部署調整
 - 透過 ROS2 topic 與 parameters 保留後續整合能力
 
 ## 系統角色
@@ -38,6 +42,17 @@ LLM 只負責理解命令並產生結構化移動意圖或唯讀狀態查詢；�
 部署需求、環境設定、小車端準備、一鍵啟動、ROS2 topics、參數調整與測試方式請參閱：
 
 **[Automation 2026 設定與操作手冊](docs/SETUP.md)**
+
+## 論文與可重現性
+
+Automation 2026 reference artifact：
+
+- [評估重現指南](docs/EVALUATION.md)
+- [Guarded Hybrid 設計規格](docs/GUARD_DESIGN.md)
+- [完整可重現性與證據限制](docs/REPRODUCIBILITY.md)
+- [320 句雙語評估語料](tests/corpus/commands_320.csv)
+
+正式 benchmark 只測文字解析，不匯入 ROS、不建立 publisher，也不發布 `/cmd_vel`。
 
 ## 授權
 

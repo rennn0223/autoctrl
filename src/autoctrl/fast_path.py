@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from dataclasses import replace
 
 from .domain import LinearDirection, MotionIntent, MotionKind, TurnDirection
 
@@ -101,3 +102,70 @@ class FastPathInterpreter:
             source="fast_path",
             original_text=text,
         )
+
+
+_NEGATED_STOP = re.compile(
+    r"(?:不要|別|不必|不用)(?:再|繼續)?(?:停|停止)|\b(?:do\s+not|don.t|dont)\s+stop\b",
+    re.I,
+)
+_NEGATED_MOTION = re.compile(
+    r"(?:別|不要|不必|不用)(?:再|繼續)?"
+    r"(?:往前|向前|前進|往後|向後|後退|倒退|倒車|左轉|右轉|移動|走|開|轉)"
+    r"|\b(?:do\s+not|don.t|dont)\s+(?:go|move|turn|advance|back|continue)\b"
+    r"|\bstop\s+(?:going|moving|turning|advancing|backing)\b",
+    re.I,
+)
+_ENGLISH_QUESTION = re.compile(r"\b(?:where|what|which|why|who|whose|when|how)\b", re.I)
+_CHINESE_QUESTION_WORDS = ("哪裡", "在哪", "什麼", "多少", "是否", "為什麼", "怎麼", "幾度", "幾公尺")
+_DIRECTION_HINTS = (
+    ("往前", "向前", "前進", "朝前", "forward", "advance", "ahead"),
+    ("往後", "向後", "後退", "倒退", "倒車", "backward", "back up", "retreat"),
+    ("左轉", "往左", "向左", "轉左", "left"),
+    ("右轉", "往右", "向右", "轉右", "right"),
+)
+_DISTANCE_UNIT_HINT = re.compile(
+    r"公尺|公分|厘米|\bcm\b|\bmm\b|\bmeters?\b|\bmetres?\b|\bfeet\b|\bfoot\b|\bft\b|(?<![a-z])m(?![a-z])",
+    re.I,
+)
+_ANGLE_UNIT_HINT = re.compile(r"度|°|\bdegrees?\b|\bradians?\b", re.I)
+_SPEED_UNIT_HINT = re.compile(r"m\s*\/\s*s|公尺\s*\/\s*秒|米\s*\/\s*秒|\bmps\b", re.I)
+
+
+class GuardedFastPathInterpreter(FastPathInterpreter):
+    """High-confidence deterministic parser that defers uncertain language."""
+
+    def interpret(self, text: str) -> MotionIntent | None:
+        stripped = text.strip()
+        normalized = re.sub(r"\s+", "", stripped.lower())
+        if not normalized:
+            return None
+
+        if _NEGATED_STOP.search(stripped):
+            return None
+        if _NEGATED_MOTION.search(stripped):
+            return MotionIntent.stop(source="guarded_fast_path", original_text=text)
+        if _ENGLISH_QUESTION.search(stripped) or any(word in normalized for word in _CHINESE_QUESTION_WORDS):
+            return None
+
+        direction_count = sum(any(word in stripped.lower() for word in words) for words in _DIRECTION_HINTS)
+        if direction_count > 1:
+            return None
+
+        intent = super().interpret(text)
+        if intent is None:
+            return None
+        if _SPEED_UNIT_HINT.search(stripped):
+            return None
+        if (
+            intent.kind is MotionKind.MOVE_LINEAR
+            and _DISTANCE_UNIT_HINT.search(stripped)
+            and intent.distance_m is None
+        ):
+            return None
+        if (
+            intent.kind is MotionKind.ROTATE
+            and _ANGLE_UNIT_HINT.search(stripped)
+            and intent.angle_deg is None
+        ):
+            return None
+        return replace(intent, source="guarded_fast_path")

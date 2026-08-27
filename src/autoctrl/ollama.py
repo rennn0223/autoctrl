@@ -32,11 +32,15 @@ class OllamaInterpreter:
         model: str = "qwen3.6:35b",
         base_url: str = "http://127.0.0.1:11434",
         timeout_s: float = 120,
+        temperature: float = 0.0,
+        seed: int = 42,
         transport: Transport | None = None,
     ) -> None:
         self.model = model
         self.base_url = base_url.rstrip("/")
         self.timeout_s = timeout_s
+        self.temperature = temperature
+        self.seed = seed
         self._transport = transport or self._http_transport
 
     def interpret(self, text: str) -> CommandRequest:
@@ -45,6 +49,7 @@ class OllamaInterpreter:
             "stream": False,
             "think": False,
             "keep_alive": -1,
+            "options": {"temperature": self.temperature, "seed": self.seed},
             "messages": [
                 {
                     "role": "system",
@@ -55,6 +60,7 @@ class OllamaInterpreter:
                         "使用者詢問 ROS topics、目前位置或電池電壓時，呼叫對應的唯讀查詢工具。"
                         "一次只選擇一個最符合使用者主要意圖的工具。"
                         "若只是問候或一般聊天，請簡短自然回覆，不要呼叫任何工具。"
+                        "系統不具備目的地導航或燈光控制；遇到此類要求不得改用狀態查詢或移動工具。"
                         "輸入不清楚、互相矛盾，或既不是車輛移動也不是上述狀態查詢時，"
                         "不要呼叫工具，簡短說明需要澄清。"
                     ),
@@ -94,9 +100,24 @@ class OllamaInterpreter:
                 "stream": False,
                 "think": False,
                 "keep_alive": -1,
+                "options": {"temperature": self.temperature, "seed": self.seed},
                 "messages": [{"role": "user", "content": "只回答 ready"}],
             }
         )
+
+    def check_ready(self, *, timeout_s: float = 2.0) -> tuple[bool, str]:
+        request = Request(
+            f"{self.base_url}/api/show",
+            data=json.dumps({"model": self.model}).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urlopen(request, timeout=timeout_s) as response:
+                response.read()
+        except (HTTPError, URLError, TimeoutError) as exc:
+            return False, f"{self.model} · 無法使用（{exc}）"
+        return True, f"{self.model} · 已就緒"
 
     def _http_transport(self, payload: dict[str, Any]) -> dict[str, Any]:
         request = Request(
@@ -160,7 +181,7 @@ _TOOLS: list[dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "query_ros_topics",
-            "description": "唯讀查詢目前可見的 /small ROS 2 topics 與訊息型別。",
+            "description": "唯讀查詢目前設定之機器人 namespace 下的 ROS 2 topics 與訊息型別。",
             "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
         },
     },
