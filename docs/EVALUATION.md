@@ -6,7 +6,7 @@
 
 ## 環境需求
 
-論文候選結果使用以下環境：
+`automation2026-eval-v1` 正式結果使用以下環境：
 
 - Python 3.12
 - [uv](https://docs.astral.sh/uv/)（依 `uv.lock` 建立隔離環境）
@@ -144,15 +144,28 @@ uv run python scripts/evaluate.py \
 
 這個入口會以鎖定的 pytest 8.x 跑完整測試，再執行 `evaluate.py --release`。`--release` 會拒絕 dirty tree、不完整 corpus、缺少 baseline，以及無法取得 Ollama 版本或 model digest 的環境。
 
-## Known limitation 與結果定位
+## 公開正式結果
 
-產生目前論文數據時，working tree 曾包含未提交變更，因此 `metadata.csv` 的 `git_dirty` 可能為 `True`。這表示當次執行雖有記錄 Git commit hash 與 corpus hash，但 commit hash 本身不足以完整還原所有實際執行程式碼。
+論文 Table I 的正式 reference run 收錄於 [`artifacts/automation2026-eval-v1`](../artifacts/automation2026-eval-v1)：
 
-因此，目前結果定位為 **candidate release**，適合用於論文撰寫、圖表整理與方法比較，但在定稿投稿前應：
+- 執行時間：2026-08-27 14:42（UTC+8）
+- Git commit：`afd4aba3ea910a78e186328f5c706882d3d551e7`
+- working tree：clean（`git_dirty=False`）
+- corpus SHA-256：`0747f1777e22668ca9c2e289449334030fb6d93f76db7d0f539d77774052ffa4`
+- model digest：`07d35212591fc27746f0a317c975a6d68754fb38e9053d82e25f06057af28522`
 
-1. 將評估程式、320 句語料與依賴鎖定檔固定於可識別的 commit 或 release tag。
-2. 確認 working tree 為乾淨狀態。
-3. 在相同 Python、Ollama 與模型版本下重新執行完整四方法評估。
-4. 保存新結果的 `metadata.csv`、語料 SHA-256 與 Git commit hash，並以該次輸出更新最終 Table I。
+| 方法 | Request class | Exact request | Requested slots | Mean latency (ms) | P95 (ms) |
+|---|---:|---:|---:|---:|---:|
+| Rule-only | 70.9% | 70.6% | 67.2% | 0.0 | 0.0 |
+| LLM-only | 95.3% | 94.4% | 100.0% | 1304.9 | 1719.7 |
+| Hybrid v0 | 93.1% | 87.5% | 76.6% | 582.0 | 1708.5 |
+| Guarded Hybrid | 94.1% | 93.4% | 100.0% | 611.8 | 1699.2 |
 
-在完成上述 release run 前，論文中應將目前數據標示為 candidate results，避免宣稱其已達到完全可重現的正式 release 狀態。
+完整精度、Wilson 95% CI 與檢定結果應以 artifact 內的 CSV 為準。Guarded Hybrid 對 Hybrid v0 的 exact McNemar `p=0.0000660`；對 LLM-only 為 `p=0.6072`。
+
+## Known limitations
+
+- 每個 utterance 只執行一次模型推論；結果尚未量化跨次推論變異。
+- 語料與初始標籤由同一作者建立，尚未完成雙人獨立標註。
+- parser-only benchmark 不代表實際底盤運動誤差或緊急停止能力。
+- 延遲數值與 DGX Spark、當下負載及模型 runtime 綁定，不應直接外推至其他硬體。

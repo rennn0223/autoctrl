@@ -1,0 +1,869 @@
+{
+  "metadata": {
+    "study": "parser-only fixed-corpus evaluation",
+    "timestamp": "2026-08-27T14:42:02+08:00",
+    "model": "qwen3.6:35b",
+    "ollama_url": "http://127.0.0.1:11434",
+    "ollama": {
+      "version": "0.23.4",
+      "model_digest": "07d35212591fc27746f0a317c975a6d68754fb38e9053d82e25f06057af28522",
+      "model_size_bytes": 23938333577,
+      "model_modified_at": "2026-05-26T12:55:48.131172322+08:00",
+      "version_error": "",
+      "tags_error": ""
+    },
+    "dataset": "tests/corpus/commands_320.csv",
+    "dataset_sha256": "0747f1777e22668ca9c2e289449334030fb6d93f76db7d0f539d77774052ffa4",
+    "uv_lock_sha256": "061a0b5b1d836222d550fd9485b3d8684fe9ad5b977abff417b6038aefe014af",
+    "evaluator_sha256": "a9fd4e547b74dea5fdb033c90833dab635fe75a95d01a7ce1ed33ce2c89f1888",
+    "dataset_counts": {
+      "total": 320,
+      "languages": {
+        "en": 160,
+        "zh": 160
+      },
+      "categories": {
+        "ambiguous": 32,
+        "canonical_motion": 48,
+        "conversation": 48,
+        "long_tail_motion": 64,
+        "parameterized_motion": 64,
+        "status": 64
+      },
+      "routes": {
+        "motion": 176,
+        "no_tool": 80,
+        "status": 64
+      }
+    },
+    "baselines": [
+      "rule-only",
+      "llm-only",
+      "hybrid-v0",
+      "guarded-hybrid"
+    ],
+    "python": "3.12.3 (main, Jun 19 2026, 12:46:00) [GCC 13.3.0]",
+    "platform": "Linux-6.17.0-1026-nvidia-aarch64-with-glibc2.39",
+    "git": {
+      "commit": "afd4aba3ea910a78e186328f5c706882d3d551e7",
+      "dirty": false
+    },
+    "ros_imported": false,
+    "ros_node_created": false,
+    "cmd_vel_published": false,
+    "warmup_excluded_from_latency": true,
+    "sampling": "temperature=0.0, seed=42; one observation per utterance"
+  },
+  "summaries": [
+    {
+      "baseline": "rule-only",
+      "cases": 320,
+      "route_accuracy": {
+        "correct": 227,
+        "total": 320,
+        "rate": 0.709375,
+        "ci95_low": 0.6573767550575468,
+        "ci95_high": 0.7564059659318422
+      },
+      "exact_request_accuracy": {
+        "correct": 226,
+        "total": 320,
+        "rate": 0.70625,
+        "ci95_low": 0.65413532832827,
+        "ci95_high": 0.7534715311538147
+      },
+      "motion_intent_accuracy": {
+        "correct": 111,
+        "total": 176,
+        "rate": 0.6306818181818182,
+        "ci95_low": 0.5572995579538973,
+        "ci95_high": 0.6984812853602298
+      },
+      "requested_slot_accuracy": {
+        "correct": 43,
+        "total": 64,
+        "rate": 0.671875,
+        "ci95_low": 0.549991058490915,
+        "ci95_high": 0.7742944209553081
+      },
+      "status_accuracy": {
+        "correct": 41,
+        "total": 64,
+        "rate": 0.640625,
+        "ci95_low": 0.518208506097791,
+        "ci95_high": 0.7471159770854825
+      },
+      "no_tool_accuracy": {
+        "correct": 74,
+        "total": 80,
+        "rate": 0.925,
+        "ci95_low": 0.8458798391878072,
+        "ci95_high": 0.9651747507069949
+      },
+      "false_nonzero_actuation_rate": {
+        "events": 2,
+        "total": 160,
+        "rate": 0.0125
+      },
+      "supported_tool_coverage": {
+        "correct": 158,
+        "total": 240,
+        "rate": 0.6583333333333333,
+        "ci95_low": 0.5962591015682508,
+        "ci95_high": 0.715418823783589
+      },
+      "errors": 12,
+      "source_counts": {
+        "error_safe_fallback": 12,
+        "guarded_fast_path": 118,
+        "guarded_status_fast_path": 46,
+        "rule_only_fallback": 144
+      },
+      "latency_ms": {
+        "mean": 0.0117061,
+        "p50": 0.011064000000000001,
+        "p95": 0.0163864,
+        "max": 0.125537
+      },
+      "category_breakdown": {
+        "ambiguous": {
+          "route_accuracy": {
+            "correct": 27,
+            "total": 32,
+            "rate": 0.84375,
+            "ci95_low": 0.682458504024696,
+            "ci95_high": 0.9313557971749429
+          },
+          "exact_accuracy": {
+            "correct": 27,
+            "total": 32,
+            "rate": 0.84375,
+            "ci95_low": 0.682458504024696,
+            "ci95_high": 0.9313557971749429
+          }
+        },
+        "canonical_motion": {
+          "route_accuracy": {
+            "correct": 44,
+            "total": 48,
+            "rate": 0.9166666666666666,
+            "ci95_low": 0.8044669820963272,
+            "ci95_high": 0.9671162431819081
+          },
+          "exact_accuracy": {
+            "correct": 44,
+            "total": 48,
+            "rate": 0.9166666666666666,
+            "ci95_low": 0.8044669820963272,
+            "ci95_high": 0.9671162431819081
+          }
+        },
+        "conversation": {
+          "route_accuracy": {
+            "correct": 47,
+            "total": 48,
+            "rate": 0.9791666666666666,
+            "ci95_low": 0.8910078200474814,
+            "ci95_high": 0.9963128890224893
+          },
+          "exact_accuracy": {
+            "correct": 47,
+            "total": 48,
+            "rate": 0.9791666666666666,
+            "ci95_low": 0.8910078200474814,
+            "ci95_high": 0.9963128890224893
+          }
+        },
+        "long_tail_motion": {
+          "route_accuracy": {
+            "correct": 25,
+            "total": 64,
+            "rate": 0.390625,
+            "ci95_low": 0.2805556918824008,
+            "ci95_high": 0.5130808211972754
+          },
+          "exact_accuracy": {
+            "correct": 24,
+            "total": 64,
+            "rate": 0.375,
+            "ci95_low": 0.2666598017882464,
+            "ci95_high": 0.497496213159955
+          }
+        },
+        "parameterized_motion": {
+          "route_accuracy": {
+            "correct": 43,
+            "total": 64,
+            "rate": 0.671875,
+            "ci95_low": 0.549991058490915,
+            "ci95_high": 0.7742944209553081
+          },
+          "exact_accuracy": {
+            "correct": 43,
+            "total": 64,
+            "rate": 0.671875,
+            "ci95_low": 0.549991058490915,
+            "ci95_high": 0.7742944209553081
+          }
+        },
+        "status": {
+          "route_accuracy": {
+            "correct": 41,
+            "total": 64,
+            "rate": 0.640625,
+            "ci95_low": 0.518208506097791,
+            "ci95_high": 0.7471159770854825
+          },
+          "exact_accuracy": {
+            "correct": 41,
+            "total": 64,
+            "rate": 0.640625,
+            "ci95_low": 0.518208506097791,
+            "ci95_high": 0.7471159770854825
+          }
+        }
+      },
+      "language_breakdown": {
+        "en": {
+          "route_accuracy": {
+            "correct": 111,
+            "total": 160,
+            "rate": 0.69375,
+            "ci95_low": 0.6184822211553903,
+            "ci95_high": 0.7599323782156514
+          },
+          "exact_accuracy": {
+            "correct": 110,
+            "total": 160,
+            "rate": 0.6875,
+            "ci95_low": 0.6119941011632154,
+            "ci95_high": 0.7542135756474703
+          }
+        },
+        "zh": {
+          "route_accuracy": {
+            "correct": 116,
+            "total": 160,
+            "rate": 0.725,
+            "ci95_low": 0.6511504495603382,
+            "ci95_high": 0.7882987626124844
+          },
+          "exact_accuracy": {
+            "correct": 116,
+            "total": 160,
+            "rate": 0.725,
+            "ci95_low": 0.6511504495603382,
+            "ci95_high": 0.7882987626124844
+          }
+        }
+      }
+    },
+    {
+      "baseline": "llm-only",
+      "cases": 320,
+      "route_accuracy": {
+        "correct": 305,
+        "total": 320,
+        "rate": 0.953125,
+        "ci95_low": 0.9241096241692968,
+        "ci95_high": 0.9713902943898287
+      },
+      "exact_request_accuracy": {
+        "correct": 302,
+        "total": 320,
+        "rate": 0.94375,
+        "ci95_low": 0.9128459298904129,
+        "ci95_high": 0.9641264041467997
+      },
+      "motion_intent_accuracy": {
+        "correct": 171,
+        "total": 176,
+        "rate": 0.9715909090909091,
+        "ci95_low": 0.9352296387454299,
+        "ci95_high": 0.9878055784316374
+      },
+      "requested_slot_accuracy": {
+        "correct": 64,
+        "total": 64,
+        "rate": 1.0,
+        "ci95_low": 0.9433759402071946,
+        "ci95_high": 1.0
+      },
+      "status_accuracy": {
+        "correct": 64,
+        "total": 64,
+        "rate": 1.0,
+        "ci95_low": 0.9433759402071946,
+        "ci95_high": 1.0
+      },
+      "no_tool_accuracy": {
+        "correct": 70,
+        "total": 80,
+        "rate": 0.875,
+        "ci95_low": 0.7849719790084033,
+        "ci95_high": 0.9306644238399513
+      },
+      "false_nonzero_actuation_rate": {
+        "events": 4,
+        "total": 160,
+        "rate": 0.025
+      },
+      "supported_tool_coverage": {
+        "correct": 235,
+        "total": 240,
+        "rate": 0.9791666666666666,
+        "ci95_low": 0.9521666228373029,
+        "ci95_high": 0.9910692038853699
+      },
+      "errors": 10,
+      "source_counts": {
+        "error_safe_fallback": 10,
+        "ollama": 310
+      },
+      "latency_ms": {
+        "mean": 1304.855406034375,
+        "p50": 1264.3543224999999,
+        "p95": 1719.7088855000002,
+        "max": 5061.333729
+      },
+      "category_breakdown": {
+        "ambiguous": {
+          "route_accuracy": {
+            "correct": 22,
+            "total": 32,
+            "rate": 0.6875,
+            "ci95_low": 0.5143332169904459,
+            "ci95_high": 0.8204745836639026
+          },
+          "exact_accuracy": {
+            "correct": 22,
+            "total": 32,
+            "rate": 0.6875,
+            "ci95_low": 0.5143332169904459,
+            "ci95_high": 0.8204745836639026
+          }
+        },
+        "canonical_motion": {
+          "route_accuracy": {
+            "correct": 48,
+            "total": 48,
+            "rate": 1.0,
+            "ci95_low": 0.9258998703338824,
+            "ci95_high": 0.9999999999999999
+          },
+          "exact_accuracy": {
+            "correct": 48,
+            "total": 48,
+            "rate": 1.0,
+            "ci95_low": 0.9258998703338824,
+            "ci95_high": 0.9999999999999999
+          }
+        },
+        "conversation": {
+          "route_accuracy": {
+            "correct": 48,
+            "total": 48,
+            "rate": 1.0,
+            "ci95_low": 0.9258998703338824,
+            "ci95_high": 0.9999999999999999
+          },
+          "exact_accuracy": {
+            "correct": 48,
+            "total": 48,
+            "rate": 1.0,
+            "ci95_low": 0.9258998703338824,
+            "ci95_high": 0.9999999999999999
+          }
+        },
+        "long_tail_motion": {
+          "route_accuracy": {
+            "correct": 59,
+            "total": 64,
+            "rate": 0.921875,
+            "ci95_low": 0.8298046264583709,
+            "ci95_high": 0.9661688230914496
+          },
+          "exact_accuracy": {
+            "correct": 56,
+            "total": 64,
+            "rate": 0.875,
+            "ci95_low": 0.7722543817887005,
+            "ci95_high": 0.9352775733666955
+          }
+        },
+        "parameterized_motion": {
+          "route_accuracy": {
+            "correct": 64,
+            "total": 64,
+            "rate": 1.0,
+            "ci95_low": 0.9433759402071946,
+            "ci95_high": 1.0
+          },
+          "exact_accuracy": {
+            "correct": 64,
+            "total": 64,
+            "rate": 1.0,
+            "ci95_low": 0.9433759402071946,
+            "ci95_high": 1.0
+          }
+        },
+        "status": {
+          "route_accuracy": {
+            "correct": 64,
+            "total": 64,
+            "rate": 1.0,
+            "ci95_low": 0.9433759402071946,
+            "ci95_high": 1.0
+          },
+          "exact_accuracy": {
+            "correct": 64,
+            "total": 64,
+            "rate": 1.0,
+            "ci95_low": 0.9433759402071946,
+            "ci95_high": 1.0
+          }
+        }
+      },
+      "language_breakdown": {
+        "en": {
+          "route_accuracy": {
+            "correct": 153,
+            "total": 160,
+            "rate": 0.95625,
+            "ci95_low": 0.9124569584575362,
+            "ci95_high": 0.9786483884484656
+          },
+          "exact_accuracy": {
+            "correct": 151,
+            "total": 160,
+            "rate": 0.94375,
+            "ci95_low": 0.8965638035410534,
+            "ci95_high": 0.9701276982442358
+          }
+        },
+        "zh": {
+          "route_accuracy": {
+            "correct": 152,
+            "total": 160,
+            "rate": 0.95,
+            "ci95_low": 0.9044490208244798,
+            "ci95_high": 0.9744494035211655
+          },
+          "exact_accuracy": {
+            "correct": 151,
+            "total": 160,
+            "rate": 0.94375,
+            "ci95_low": 0.8965638035410534,
+            "ci95_high": 0.9701276982442358
+          }
+        }
+      }
+    },
+    {
+      "baseline": "hybrid-v0",
+      "cases": 320,
+      "route_accuracy": {
+        "correct": 298,
+        "total": 320,
+        "rate": 0.93125,
+        "ci95_low": 0.8981054394248181,
+        "ci95_high": 0.9541634485831773
+      },
+      "exact_request_accuracy": {
+        "correct": 280,
+        "total": 320,
+        "rate": 0.875,
+        "ci95_low": 0.8342582877301691,
+        "ci95_high": 0.9068450931463486
+      },
+      "motion_intent_accuracy": {
+        "correct": 170,
+        "total": 176,
+        "rate": 0.9659090909090909,
+        "ci95_low": 0.9276303705506951,
+        "ci95_high": 0.9842839403953233
+      },
+      "requested_slot_accuracy": {
+        "correct": 49,
+        "total": 64,
+        "rate": 0.765625,
+        "ci95_low": 0.6486674241743136,
+        "ci95_high": 0.8525010440607586
+      },
+      "status_accuracy": {
+        "correct": 59,
+        "total": 64,
+        "rate": 0.921875,
+        "ci95_low": 0.8298046264583709,
+        "ci95_high": 0.9661688230914496
+      },
+      "no_tool_accuracy": {
+        "correct": 67,
+        "total": 80,
+        "rate": 0.8375,
+        "ci95_low": 0.7415709565930229,
+        "ci95_high": 0.9025018059704963
+      },
+      "false_nonzero_actuation_rate": {
+        "events": 8,
+        "total": 160,
+        "rate": 0.05
+      },
+      "supported_tool_coverage": {
+        "correct": 235,
+        "total": 240,
+        "rate": 0.9791666666666666,
+        "ci95_low": 0.9521666228373029,
+        "ci95_high": 0.9910692038853699
+      },
+      "errors": 9,
+      "source_counts": {
+        "error_safe_fallback": 9,
+        "fast_path": 134,
+        "ollama": 143,
+        "status_fast_path": 34
+      },
+      "latency_ms": {
+        "mean": 582.0340138375,
+        "p50": 0.039088,
+        "p95": 1708.4938768500003,
+        "max": 5055.609893
+      },
+      "category_breakdown": {
+        "ambiguous": {
+          "route_accuracy": {
+            "correct": 20,
+            "total": 32,
+            "rate": 0.625,
+            "ci95_low": 0.4525440735307745,
+            "ci95_high": 0.7706611269054578
+          },
+          "exact_accuracy": {
+            "correct": 20,
+            "total": 32,
+            "rate": 0.625,
+            "ci95_low": 0.4525440735307745,
+            "ci95_high": 0.7706611269054578
+          }
+        },
+        "canonical_motion": {
+          "route_accuracy": {
+            "correct": 48,
+            "total": 48,
+            "rate": 1.0,
+            "ci95_low": 0.9258998703338824,
+            "ci95_high": 0.9999999999999999
+          },
+          "exact_accuracy": {
+            "correct": 48,
+            "total": 48,
+            "rate": 1.0,
+            "ci95_low": 0.9258998703338824,
+            "ci95_high": 0.9999999999999999
+          }
+        },
+        "conversation": {
+          "route_accuracy": {
+            "correct": 47,
+            "total": 48,
+            "rate": 0.9791666666666666,
+            "ci95_low": 0.8910078200474814,
+            "ci95_high": 0.9963128890224893
+          },
+          "exact_accuracy": {
+            "correct": 47,
+            "total": 48,
+            "rate": 0.9791666666666666,
+            "ci95_low": 0.8910078200474814,
+            "ci95_high": 0.9963128890224893
+          }
+        },
+        "long_tail_motion": {
+          "route_accuracy": {
+            "correct": 60,
+            "total": 64,
+            "rate": 0.9375,
+            "ci95_low": 0.8500251490779133,
+            "ci95_high": 0.9754287986033819
+          },
+          "exact_accuracy": {
+            "correct": 57,
+            "total": 64,
+            "rate": 0.890625,
+            "ci95_low": 0.7910135867310387,
+            "ci95_high": 0.945998866555832
+          }
+        },
+        "parameterized_motion": {
+          "route_accuracy": {
+            "correct": 64,
+            "total": 64,
+            "rate": 1.0,
+            "ci95_low": 0.9433759402071946,
+            "ci95_high": 1.0
+          },
+          "exact_accuracy": {
+            "correct": 49,
+            "total": 64,
+            "rate": 0.765625,
+            "ci95_low": 0.6486674241743136,
+            "ci95_high": 0.8525010440607586
+          }
+        },
+        "status": {
+          "route_accuracy": {
+            "correct": 59,
+            "total": 64,
+            "rate": 0.921875,
+            "ci95_low": 0.8298046264583709,
+            "ci95_high": 0.9661688230914496
+          },
+          "exact_accuracy": {
+            "correct": 59,
+            "total": 64,
+            "rate": 0.921875,
+            "ci95_low": 0.8298046264583709,
+            "ci95_high": 0.9661688230914496
+          }
+        }
+      },
+      "language_breakdown": {
+        "en": {
+          "route_accuracy": {
+            "correct": 147,
+            "total": 160,
+            "rate": 0.91875,
+            "ci95_low": 0.8659596262286716,
+            "ci95_high": 0.9519041853151927
+          },
+          "exact_accuracy": {
+            "correct": 132,
+            "total": 160,
+            "rate": 0.825,
+            "ci95_low": 0.7587019750779815,
+            "ci95_high": 0.8760579980605401
+          }
+        },
+        "zh": {
+          "route_accuracy": {
+            "correct": 151,
+            "total": 160,
+            "rate": 0.94375,
+            "ci95_low": 0.8965638035410534,
+            "ci95_high": 0.9701276982442358
+          },
+          "exact_accuracy": {
+            "correct": 148,
+            "total": 160,
+            "rate": 0.925,
+            "ci95_low": 0.8734917309593303,
+            "ci95_high": 0.9565790031448905
+          }
+        }
+      }
+    },
+    {
+      "baseline": "guarded-hybrid",
+      "cases": 320,
+      "route_accuracy": {
+        "correct": 301,
+        "total": 320,
+        "rate": 0.940625,
+        "ci95_low": 0.9091338878775519,
+        "ci95_high": 0.9616625846523565
+      },
+      "exact_request_accuracy": {
+        "correct": 299,
+        "total": 320,
+        "rate": 0.934375,
+        "ci95_low": 0.9017648135937429,
+        "ci95_high": 0.9566799359215566
+      },
+      "motion_intent_accuracy": {
+        "correct": 169,
+        "total": 176,
+        "rate": 0.9602272727272727,
+        "ci95_low": 0.9201906360780736,
+        "ci95_high": 0.9806027686368957
+      },
+      "requested_slot_accuracy": {
+        "correct": 64,
+        "total": 64,
+        "rate": 1.0,
+        "ci95_low": 0.9433759402071946,
+        "ci95_high": 1.0
+      },
+      "status_accuracy": {
+        "correct": 61,
+        "total": 64,
+        "rate": 0.953125,
+        "ci95_low": 0.8710034625990631,
+        "ci95_high": 0.983930983213707
+      },
+      "no_tool_accuracy": {
+        "correct": 70,
+        "total": 80,
+        "rate": 0.875,
+        "ci95_low": 0.7849719790084033,
+        "ci95_high": 0.9306644238399513
+      },
+      "false_nonzero_actuation_rate": {
+        "events": 6,
+        "total": 160,
+        "rate": 0.0375
+      },
+      "supported_tool_coverage": {
+        "correct": 236,
+        "total": 240,
+        "rate": 0.9833333333333333,
+        "ci95_low": 0.9579378181116581,
+        "ci95_high": 0.9935000592781683
+      },
+      "errors": 12,
+      "source_counts": {
+        "error_safe_fallback": 12,
+        "guarded_fast_path": 118,
+        "guarded_status_fast_path": 46,
+        "ollama": 144
+      },
+      "latency_ms": {
+        "mean": 611.8317860531249,
+        "p50": 0.083056,
+        "p95": 1699.16732225,
+        "max": 5078.756511
+      },
+      "category_breakdown": {
+        "ambiguous": {
+          "route_accuracy": {
+            "correct": 23,
+            "total": 32,
+            "rate": 0.71875,
+            "ci95_low": 0.5462549057408342,
+            "ci95_high": 0.8443541950225723
+          },
+          "exact_accuracy": {
+            "correct": 23,
+            "total": 32,
+            "rate": 0.71875,
+            "ci95_low": 0.5462549057408342,
+            "ci95_high": 0.8443541950225723
+          }
+        },
+        "canonical_motion": {
+          "route_accuracy": {
+            "correct": 48,
+            "total": 48,
+            "rate": 1.0,
+            "ci95_low": 0.9258998703338824,
+            "ci95_high": 0.9999999999999999
+          },
+          "exact_accuracy": {
+            "correct": 48,
+            "total": 48,
+            "rate": 1.0,
+            "ci95_low": 0.9258998703338824,
+            "ci95_high": 0.9999999999999999
+          }
+        },
+        "conversation": {
+          "route_accuracy": {
+            "correct": 47,
+            "total": 48,
+            "rate": 0.9791666666666666,
+            "ci95_low": 0.8910078200474814,
+            "ci95_high": 0.9963128890224893
+          },
+          "exact_accuracy": {
+            "correct": 47,
+            "total": 48,
+            "rate": 0.9791666666666666,
+            "ci95_low": 0.8910078200474814,
+            "ci95_high": 0.9963128890224893
+          }
+        },
+        "long_tail_motion": {
+          "route_accuracy": {
+            "correct": 58,
+            "total": 64,
+            "rate": 0.90625,
+            "ci95_low": 0.810171204003544,
+            "ci95_high": 0.9563217474148016
+          },
+          "exact_accuracy": {
+            "correct": 56,
+            "total": 64,
+            "rate": 0.875,
+            "ci95_low": 0.7722543817887005,
+            "ci95_high": 0.9352775733666955
+          }
+        },
+        "parameterized_motion": {
+          "route_accuracy": {
+            "correct": 64,
+            "total": 64,
+            "rate": 1.0,
+            "ci95_low": 0.9433759402071946,
+            "ci95_high": 1.0
+          },
+          "exact_accuracy": {
+            "correct": 64,
+            "total": 64,
+            "rate": 1.0,
+            "ci95_low": 0.9433759402071946,
+            "ci95_high": 1.0
+          }
+        },
+        "status": {
+          "route_accuracy": {
+            "correct": 61,
+            "total": 64,
+            "rate": 0.953125,
+            "ci95_low": 0.8710034625990631,
+            "ci95_high": 0.983930983213707
+          },
+          "exact_accuracy": {
+            "correct": 61,
+            "total": 64,
+            "rate": 0.953125,
+            "ci95_low": 0.8710034625990631,
+            "ci95_high": 0.983930983213707
+          }
+        }
+      },
+      "language_breakdown": {
+        "en": {
+          "route_accuracy": {
+            "correct": 150,
+            "total": 160,
+            "rate": 0.9375,
+            "ci95_low": 0.8887842459710525,
+            "ci95_high": 0.9657003332538804
+          },
+          "exact_accuracy": {
+            "correct": 148,
+            "total": 160,
+            "rate": 0.925,
+            "ci95_low": 0.8734917309593303,
+            "ci95_high": 0.9565790031448905
+          }
+        },
+        "zh": {
+          "route_accuracy": {
+            "correct": 151,
+            "total": 160,
+            "rate": 0.94375,
+            "ci95_low": 0.8965638035410534,
+            "ci95_high": 0.9701276982442358
+          },
+          "exact_accuracy": {
+            "correct": 151,
+            "total": 160,
+            "rate": 0.94375,
+            "ci95_low": 0.8965638035410534,
+            "ci95_high": 0.9701276982442358
+          }
+        }
+      }
+    }
+  ]
+}

@@ -54,6 +54,10 @@ uv run pytest -q
 - baseline 與 sampling 設定
 - ROS import／node／publisher 安全欄位
 
+## Reference release
+
+公開結果位於 [`artifacts/automation2026-eval-v1`](../artifacts/automation2026-eval-v1)，對應乾淨 commit `afd4aba3ea910a78e186328f5c706882d3d551e7`。該次執行使用 Ollama 0.23.4 與完整 model digest，並通過 65 項自動測試。所有表格數字應由 artifact 的 `metrics.csv` 產生，不從圖片手動抄錄。
+
 ## 統計輸出
 
 - `metrics.csv`：request-class、exact-request、requested-slot accuracy，Wilson 95% CI，以及 mean/P95 latency。

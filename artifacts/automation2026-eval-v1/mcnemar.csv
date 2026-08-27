@@ -1,0 +1,3 @@
+baseline_a,baseline_b,a_correct_b_wrong,a_wrong_b_correct,discordant_pairs,exact_mcnemar_p_two_sided
+guarded-hybrid,hybrid-v0,21,2,23,6.604194641113281e-05
+guarded-hybrid,llm-only,6,9,15,0.60723876953125
