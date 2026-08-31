@@ -1,0 +1,5 @@
+Method,Request class (%),Exact request (%),Requested slots (%),Mean latency (ms),P95 latency (ms)
+Rule-only,70.9,70.6,67.2,0.0,0.0
+LLM-only,95.3,94.4,100.0,1304.9,1719.7
+Hybrid v0,93.1,87.5,76.6,582.0,1708.5
+Guarded Hybrid,94.1,93.4,100.0,611.8,1699.2

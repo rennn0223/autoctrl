@@ -10,6 +10,7 @@ AutoCtrl 的 320 句雙語 parser-only reference benchmark。此目錄對應乾�
 - `metadata.csv`：commit、corpus／evaluator／lockfile hash、Ollama 與模型 digest。
 - `summary.json`：完整機器可讀統計。
 - `REPORT.md`：人工可讀摘要。
+- `figures/`：論文可直接使用的 300 dpi PNG、向量 PDF／SVG，以及精簡 Table I CSV。
 
 ## 引用與驗證
 
