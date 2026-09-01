@@ -34,6 +34,18 @@ class FastPathTests(unittest.TestCase):
         self.assertEqual(intent.turn_direction, TurnDirection.LEFT)
         self.assertIsNone(intent.angle_deg)
 
+    def test_turn_for_chinese_seconds(self) -> None:
+        intent = self.parser.interpret("右轉兩秒")
+        self.assertEqual(intent.turn_direction, TurnDirection.RIGHT)
+        self.assertEqual(intent.duration_s, 2.0)
+        self.assertIsNone(intent.angle_deg)
+
+    def test_forward_for_decimal_seconds(self) -> None:
+        intent = self.parser.interpret("往前 1.5 秒")
+        self.assertEqual(intent.linear_direction, LinearDirection.FORWARD)
+        self.assertEqual(intent.duration_s, 1.5)
+        self.assertIsNone(intent.distance_m)
+
     def test_go_right_is_continuous_right_turn(self) -> None:
         intent = self.parser.interpret("go right")
         self.assertIsNotNone(intent)

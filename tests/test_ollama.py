@@ -35,6 +35,27 @@ class OllamaInterpreterTests(unittest.TestCase):
         self.assertEqual(intent.linear_direction, LinearDirection.FORWARD)
         self.assertEqual(intent.distance_m, 0.8)
 
+    def test_maps_duration_to_timed_intent(self) -> None:
+        interpreter = OllamaInterpreter(
+            transport=lambda _: {
+                "message": {
+                    "tool_calls": [
+                        {
+                            "function": {
+                                "name": "rotate_vehicle",
+                                "arguments": {
+                                    "direction": "right",
+                                    "duration_s": 2,
+                                },
+                            }
+                        }
+                    ]
+                }
+            }
+        )
+        intent = interpreter.interpret("向右轉兩秒")
+        self.assertEqual(intent.duration_s, 2.0)
+
     def test_text_response_becomes_non_executable_conversation_reply(self) -> None:
         interpreter = OllamaInterpreter(transport=lambda _: {"message": {"content": "請說清楚"}})
         reply = interpreter.interpret("hi")
