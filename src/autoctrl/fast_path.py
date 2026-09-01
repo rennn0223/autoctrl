@@ -14,6 +14,13 @@ _RIGHT_WORDS = ("右轉", "往右轉", "向右轉", "轉右", "右邊", "right")
 
 _ARABIC_VALUE = re.compile(r"(?P<value>\d+(?:\.\d+)?)\s*(?P<unit>公尺|米|m|公分|厘米|cm|度|°)", re.I)
 _CHINESE_VALUE = re.compile(r"(?P<value>[零〇一二兩三四五六七八九十百點]+)\s*(?P<unit>公尺|米|公分|厘米|度)")
+_ARABIC_DURATION = re.compile(
+    r"(?P<value>\d+(?:\.\d+)?)\s*(?:秒鐘?|seconds?|secs?|s\b)",
+    re.I,
+)
+_CHINESE_DURATION = re.compile(
+    r"(?P<value>[零〇一二兩三四五六七八九十百點]+)\s*秒鐘?"
+)
 
 
 def _contains_any(text: str, words: tuple[str, ...]) -> bool:
@@ -66,6 +73,14 @@ def _measurement(text: str, *, angle: bool) -> float | None:
     return value
 
 
+def _duration(text: str) -> float | None:
+    match = _ARABIC_DURATION.search(text) or _CHINESE_DURATION.search(text)
+    if match is None:
+        return None
+    raw = match.group("value")
+    return float(raw) if raw[0].isdigit() else _chinese_number(raw)
+
+
 class FastPathInterpreter:
     """Deterministic parser for the commands most likely to be used on the show floor."""
 
@@ -91,6 +106,7 @@ class FastPathInterpreter:
                 kind=MotionKind.MOVE_LINEAR,
                 linear_direction=LinearDirection.FORWARD if matches["forward"] else LinearDirection.BACKWARD,
                 distance_m=_measurement(normalized, angle=False),
+                duration_s=_duration(normalized),
                 source="fast_path",
                 original_text=text,
             )
@@ -99,6 +115,7 @@ class FastPathInterpreter:
             kind=MotionKind.ROTATE,
             turn_direction=TurnDirection.LEFT if matches["left"] else TurnDirection.RIGHT,
             angle_deg=_measurement(normalized, angle=True),
+            duration_s=_duration(normalized),
             source="fast_path",
             original_text=text,
         )
@@ -129,6 +146,7 @@ _DISTANCE_UNIT_HINT = re.compile(
 )
 _ANGLE_UNIT_HINT = re.compile(r"度|°|\bdegrees?\b|\bradians?\b", re.I)
 _SPEED_UNIT_HINT = re.compile(r"m\s*\/\s*s|公尺\s*\/\s*秒|米\s*\/\s*秒|\bmps\b", re.I)
+_DURATION_UNIT_HINT = re.compile(r"秒鐘?|\bseconds?\b|\bsecs?\b|\d\s*s\b", re.I)
 
 
 class GuardedFastPathInterpreter(FastPathInterpreter):
@@ -155,6 +173,8 @@ class GuardedFastPathInterpreter(FastPathInterpreter):
         if intent is None:
             return None
         if _SPEED_UNIT_HINT.search(stripped):
+            return None
+        if _DURATION_UNIT_HINT.search(stripped) and intent.duration_s is None:
             return None
         if (
             intent.kind is MotionKind.MOVE_LINEAR

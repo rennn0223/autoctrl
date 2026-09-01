@@ -60,6 +60,7 @@ EXIT_SLASH_COMMANDS = (
 )
 ROS_SLASH_COMMANDS = (
     SlashCommand("/doctor", "檢查模型與 ROS2 狀態"),
+    SlashCommand("/twin", "查看虛實同動誤差"),
     *EXIT_SLASH_COMMANDS,
 )
 
@@ -266,6 +267,36 @@ class ConsoleUI:
         self._stop_activity()
         self._stream_assistant([("動作完成", "bold")])
 
+    def show_twin_status(self, result: dict[str, object]) -> None:
+        self._stop_activity()
+        if not bool(result.get("available")):
+            self._stream_assistant(
+                [
+                    ("虛實同動資料尚未就緒", "bold yellow"),
+                    ("\n" + str(result.get("reason", "")), "grey50"),
+                ]
+            )
+            return
+        self._stream_assistant(
+            [
+                ("虛實同動", "bold"),
+                (
+                    "\n實車位移 "
+                    f"{float(result['real_displacement_m']):.3f} m"
+                    "  ·  模擬位移 "
+                    f"{float(result['simulation_displacement_m']):.3f} m",
+                    "grey70",
+                ),
+                (
+                    "\n位移差 "
+                    f"{float(result['displacement_error_m']):.3f} m"
+                    "  ·  朝向差 "
+                    f"{float(result['heading_error_deg']):.1f}°",
+                    "cyan",
+                ),
+            ]
+        )
+
     def show_status_result(self, query: StatusQuery, result: dict[str, object]) -> None:
         self._stop_activity()
         if not bool(result.get("available")):
@@ -455,14 +486,20 @@ def describe_intent(intent: MotionIntent, config: MotionConfig) -> tuple[str, st
         label = "前進" if forward else "後退"
         speed = intent.speed_mps or config.linear_speed_mps
         signed_speed = speed if forward else -speed
-        target = "持續" if intent.distance_m is None else f"{intent.distance_m:g} 公尺"
+        if intent.duration_s is not None:
+            target = f"{intent.duration_s:g} 秒"
+        else:
+            target = "持續" if intent.distance_m is None else f"{intent.distance_m:g} 公尺"
         return f"{label}  ·  {target}", f"線速度 {signed_speed:+.2f} m/s  ·  角速度 0.00 rad/s"
 
     left = intent.turn_direction is TurnDirection.LEFT
     label = "左轉" if left else "右轉"
     angular = intent.angular_speed_rps or config.angular_speed_rps
     signed_angular = angular if left else -angular
-    target = "持續" if intent.angle_deg is None else f"{intent.angle_deg:g} 度"
+    if intent.duration_s is not None:
+        target = f"{intent.duration_s:g} 秒"
+    else:
+        target = "持續" if intent.angle_deg is None else f"{intent.angle_deg:g} 度"
     return (
         f"{label}  ·  {target}",
         f"線速度 {config.turn_linear_speed_mps:+.2f} m/s  ·  角速度 {signed_angular:+.2f} rad/s",
@@ -471,6 +508,14 @@ def describe_intent(intent: MotionIntent, config: MotionConfig) -> tuple[str, st
 
 def _is_continuous(intent: MotionIntent) -> bool:
     return (
-        (intent.kind is MotionKind.MOVE_LINEAR and intent.distance_m is None)
-        or (intent.kind is MotionKind.ROTATE and intent.angle_deg is None)
+        (
+            intent.kind is MotionKind.MOVE_LINEAR
+            and intent.distance_m is None
+            and intent.duration_s is None
+        )
+        or (
+            intent.kind is MotionKind.ROTATE
+            and intent.angle_deg is None
+            and intent.duration_s is None
+        )
     )

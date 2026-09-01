@@ -6,6 +6,22 @@ from autoctrl.motion import MotionConfig, MotionController, Pose2D
 
 
 class MotionControllerTests(unittest.TestCase):
+    def test_timed_motion_stops_when_duration_expires(self) -> None:
+        now = [10.0]
+        controller = MotionController(clock=lambda: now[0])
+        controller.start(
+            MotionIntent(
+                kind=MotionKind.ROTATE,
+                turn_direction=TurnDirection.RIGHT,
+                duration_s=2.0,
+            ),
+            None,
+        )
+        self.assertFalse(controller.tick(None).stopped)
+        now[0] = 12.0
+        self.assertTrue(controller.tick(None).stopped)
+        self.assertIsNone(controller.active_intent)
+
     def test_continuous_forward_runs_until_stop(self) -> None:
         controller = MotionController(MotionConfig(linear_speed_mps=0.2))
         controller.start(

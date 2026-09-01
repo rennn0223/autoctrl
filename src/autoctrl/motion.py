@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import math
+import time
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from .domain import LinearDirection, MotionIntent, MotionKind, TurnDirection
@@ -35,9 +37,16 @@ class MotionConfig:
 class MotionController:
     """Turns validated intents into velocity commands; it has no ROS dependency."""
 
-    def __init__(self, config: MotionConfig | None = None) -> None:
+    def __init__(
+        self,
+        config: MotionConfig | None = None,
+        *,
+        clock: Callable[[], float] = time.monotonic,
+    ) -> None:
         self.config = config or MotionConfig()
+        self._clock = clock
         self._intent: MotionIntent | None = None
+        self._start_time_s: float | None = None
         self._start_pose: Pose2D | None = None
         self._last_yaw: float | None = None
         self._turned_rad = 0.0
@@ -56,12 +65,14 @@ class MotionController:
             raise ValueError("指定距離的移動需要 /odom")
 
         self._intent = intent
+        self._start_time_s = self._clock()
         self._start_pose = pose
         self._last_yaw = pose.yaw if pose is not None else None
         self._turned_rad = 0.0
 
     def stop(self) -> None:
         self._intent = None
+        self._start_time_s = None
         self._start_pose = None
         self._last_yaw = None
         self._turned_rad = 0.0
@@ -69,6 +80,13 @@ class MotionController:
     def tick(self, pose: Pose2D | None) -> Velocity:
         intent = self._intent
         if intent is None:
+            return Velocity()
+        if (
+            intent.duration_s is not None
+            and self._start_time_s is not None
+            and self._clock() - self._start_time_s >= intent.duration_s
+        ):
+            self.stop()
             return Velocity()
         if intent.kind is MotionKind.MOVE_LINEAR:
             return self._linear_velocity(intent, pose)

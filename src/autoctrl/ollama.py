@@ -56,7 +56,9 @@ class OllamaInterpreter:
                     "content": (
                         "你是台灣自動化展小車的移動命令解析器。只解析使用者想要的移動，不要自行產生底盤速度。"
                         "前進或後退未指定距離代表持續移動，直到使用者說停止；此時省略 distance_m。"
+                        "若指定執行秒數，使用 duration_s，且不可同時指定 distance_m。"
                         "左轉或右轉未指定角度時省略 angle_deg，代表沿弧線持續轉彎直到使用者說停止。"
+                        "轉向若指定執行秒數，使用 duration_s，且不可同時指定 angle_deg。"
                         "使用者詢問 ROS topics、目前位置或電池電壓時，呼叫對應的唯讀查詢工具。"
                         "一次只選擇一個最符合使用者主要意圖的工具。"
                         "若只是問候或一般聊天，請簡短自然回覆，不要呼叫任何工具。"
@@ -153,6 +155,7 @@ class OllamaInterpreter:
                     kind=MotionKind.MOVE_LINEAR,
                     linear_direction=LinearDirection(args["direction"]),
                     distance_m=_optional_float(args, "distance_m"),
+                    duration_s=_optional_float(args, "duration_s"),
                     speed_mps=_optional_float(args, "speed_mps"),
                     source="ollama",
                     original_text=text,
@@ -162,6 +165,7 @@ class OllamaInterpreter:
                     kind=MotionKind.ROTATE,
                     turn_direction=TurnDirection(args["direction"]),
                     angle_deg=_optional_float(args, "angle_deg"),
+                    duration_s=_optional_float(args, "duration_s"),
                     angular_speed_rps=_optional_float(args, "angular_speed_rps"),
                     source="ollama",
                     original_text=text,
@@ -205,12 +209,13 @@ _TOOLS: list[dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "move_linear",
-            "description": "讓小車直線前進或後退。沒有指定距離時，省略 distance_m，代表持續移動直到停止命令。",
+            "description": "讓小車直線前進或後退。可用 distance_m 指定距離，或用 duration_s 指定秒數；兩者不可同時提供。都省略時代表持續移動。",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "direction": {"type": "string", "enum": ["forward", "backward"]},
                     "distance_m": {"type": "number", "exclusiveMinimum": 0},
+                    "duration_s": {"type": "number", "exclusiveMinimum": 0},
                     "speed_mps": {"type": "number", "exclusiveMinimum": 0},
                 },
                 "required": ["direction"],
@@ -222,12 +227,13 @@ _TOOLS: list[dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "rotate_vehicle",
-            "description": "讓阿克曼小車沿弧線左轉或右轉，會同時向前移動。沒有指定角度時省略 angle_deg，代表持續轉彎直到停止命令。",
+            "description": "讓阿克曼小車沿弧線左轉或右轉，會同時向前移動。可用 angle_deg 指定角度，或用 duration_s 指定秒數；兩者不可同時提供。都省略時代表持續轉彎。",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "direction": {"type": "string", "enum": ["left", "right"]},
                     "angle_deg": {"type": "number", "exclusiveMinimum": 0},
+                    "duration_s": {"type": "number", "exclusiveMinimum": 0},
                     "angular_speed_rps": {"type": "number", "exclusiveMinimum": 0},
                 },
                 "required": ["direction"],

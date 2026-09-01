@@ -6,6 +6,7 @@ import queue
 import sys
 import threading
 import time
+from collections import deque
 from typing import Any
 
 from .console_ui import ConsoleUI, ROS_SLASH_COMMANDS
@@ -15,10 +16,19 @@ from .doctor import (
     check_ros2_environment,
     check_zenoh_bridge,
 )
-from .domain import ConversationReply, MotionIntent, MotionKind, StatusKind, StatusQuery
+from .domain import (
+    ConversationReply,
+    MotionIntent,
+    MotionKind,
+    MotionSequence,
+    StatusKind,
+    StatusQuery,
+)
 from .interpreter import HybridInterpreter
 from .motion import MotionConfig, MotionController, Pose2D, Velocity
 from .ollama import InterpretationError, OllamaInterpreter
+from .sequence import SequentialInterpreter
+from .twin import TwinMonitor
 
 
 def _yaw_from_quaternion(x: float, y: float, z: float, w: float) -> float:
@@ -79,6 +89,8 @@ class AutoCtrlNode:  # Constructed dynamically so importing the package does not
                 self.declare_parameter("cmd_vel_topic", "cmd_vel")
                 self.declare_parameter("odom_topic", "odom")
                 self.declare_parameter("power_voltage_topic", "PowerVoltage")
+                self.declare_parameter("mirror_cmd_vel_topic", "")
+                self.declare_parameter("simulation_odom_topic", "")
                 self.declare_parameter("command_topic", "/autoctrl/command")
                 self.declare_parameter("status_topic", "/autoctrl/status")
                 self.declare_parameter("linear_speed_mps", 0.30)
@@ -101,6 +113,12 @@ class AutoCtrlNode:  # Constructed dynamically so importing the package does not
                 )
                 command_topic = str(self.get_parameter("command_topic").value)
                 status_topic = str(self.get_parameter("status_topic").value)
+                mirror_cmd_vel_topic = str(
+                    self.get_parameter("mirror_cmd_vel_topic").value
+                ).strip()
+                simulation_odom_topic = str(
+                    self.get_parameter("simulation_odom_topic").value
+                ).strip()
 
                 model = str(self.get_parameter("model").value)
                 config = MotionConfig(
@@ -112,7 +130,9 @@ class AutoCtrlNode:  # Constructed dynamically so importing the package does not
                     model=model,
                     base_url=str(self.get_parameter("ollama_url").value),
                 )
-                self._interpreter = HybridInterpreter(ollama=ollama)
+                self._interpreter = SequentialInterpreter(
+                    HybridInterpreter(ollama=ollama)
+                )
                 self._ollama = ollama
                 self._config = config
                 self._interactive = bool(self.get_parameter("interactive").value)
@@ -136,16 +156,31 @@ class AutoCtrlNode:  # Constructed dynamically so importing the package does not
                     self.get_parameter("zenoh_container_name").value
                 )
                 self._pose: Pose2D | None = None
+                self._simulation_pose: Pose2D | None = None
+                self._twin_monitor = TwinMonitor()
                 self._power_voltage: float | None = None
                 self._lock = threading.Lock()
                 self._commands: queue.Queue[
                     tuple[str, threading.Event | None, bool] | None
                 ] = queue.Queue()
+                self._pending_motions: deque[MotionIntent] = deque()
                 self._zero_cycles = 0
 
                 self._cmd_pub = self.create_publisher(Twist, cmd_vel_topic, 10)
+                self._mirror_cmd_pub = (
+                    self.create_publisher(Twist, mirror_cmd_vel_topic, 10)
+                    if mirror_cmd_vel_topic
+                    else None
+                )
                 self._status_pub = self.create_publisher(String, status_topic, 10)
                 self.create_subscription(Odometry, odom_topic, self._on_odom, qos_profile_sensor_data)
+                if simulation_odom_topic:
+                    self.create_subscription(
+                        Odometry,
+                        simulation_odom_topic,
+                        self._on_simulation_odom,
+                        qos_profile_sensor_data,
+                    )
                 self.create_subscription(
                     Float32,
                     power_voltage_topic,
@@ -158,8 +193,13 @@ class AutoCtrlNode:  # Constructed dynamically so importing the package does not
 
                 self._worker = threading.Thread(target=self._command_worker, daemon=True)
                 self._worker.start()
+                control_target = (
+                    f"{cmd_vel_topic} + {mirror_cmd_vel_topic}"
+                    if mirror_cmd_vel_topic
+                    else cmd_vel_topic
+                )
                 if self._interactive:
-                    self._ui.show_header(model=model, cmd_vel_topic=cmd_vel_topic)
+                    self._ui.show_header(model=model, cmd_vel_topic=control_target)
                 else:
                     self.get_logger().info(
                         f"AutoCtrl ready: command={command_topic}, cmd_vel={cmd_vel_topic}, odom={odom_topic}"
@@ -177,6 +217,7 @@ class AutoCtrlNode:  # Constructed dynamically so importing the package does not
 
             def stop_vehicle(self) -> None:
                 with self._lock:
+                    self._pending_motions.clear()
                     self._controller.stop()
                 for _ in range(3):
                     self._publish_velocity(Velocity())
@@ -187,15 +228,16 @@ class AutoCtrlNode:  # Constructed dynamically so importing the package does not
                 return super().destroy_node()
 
             def _on_odom(self, message: Odometry) -> None:
-                position = message.pose.pose.position
-                orientation = message.pose.pose.orientation
-                pose = Pose2D(
-                    x=float(position.x),
-                    y=float(position.y),
-                    yaw=_yaw_from_quaternion(orientation.x, orientation.y, orientation.z, orientation.w),
-                )
+                pose = _pose_from_odom(message)
                 with self._lock:
                     self._pose = pose
+                    self._twin_monitor.update_real(pose)
+
+            def _on_simulation_odom(self, message: Odometry) -> None:
+                pose = _pose_from_odom(message)
+                with self._lock:
+                    self._simulation_pose = pose
+                    self._twin_monitor.update_simulation(pose)
 
             def _on_power_voltage(self, message: Float32) -> None:
                 with self._lock:
@@ -242,6 +284,13 @@ class AutoCtrlNode:  # Constructed dynamically so importing the package does not
                         if text.lower() == "/doctor":
                             self._run_doctor(automatic=automatic)
                             continue
+                        if text.lower() == "/twin":
+                            with self._lock:
+                                result = self._twin_monitor.report()
+                            self._publish_status("twin", result=result)
+                            if self._interactive:
+                                self._ui.show_twin_status(result)
+                            continue
                         self._publish_status("parsing", text=text)
                         if self._interactive:
                             self._ui.show_parsing()
@@ -271,6 +320,8 @@ class AutoCtrlNode:  # Constructed dynamically so importing the package does not
                                     self.get_logger().info(
                                         f"Answered: query={request.to_dict()} result={result}"
                                     )
+                            elif isinstance(request, MotionSequence):
+                                self._accept_sequence(request)
                             else:
                                 self._accept_motion(request)
                         except (InterpretationError, ValueError) as exc:
@@ -285,14 +336,38 @@ class AutoCtrlNode:  # Constructed dynamically so importing the package does not
 
             def _accept_motion(self, intent: MotionIntent) -> None:
                 with self._lock:
+                    self._pending_motions.clear()
                     if intent.kind is MotionKind.STOP:
                         self._zero_cycles = 3
+                    else:
+                        self._twin_monitor.reset()
                     self._controller.start(intent, self._pose)
                 self._publish_status("accepted", intent=intent.to_dict())
                 if self._interactive:
                     self._ui.show_intent(intent, self._config)
                 else:
                     self.get_logger().info(f"Accepted: {intent.to_dict()}")
+
+            def _accept_sequence(self, sequence: MotionSequence) -> None:
+                with self._lock:
+                    if self._pose is None and any(
+                        action.distance_m is not None or action.angle_deg is not None
+                        for action in sequence.actions
+                    ):
+                        raise ValueError("指定距離或角度的連續命令需要 /odom")
+                    self._controller.stop()
+                    self._twin_monitor.reset()
+                    self._pending_motions = deque(sequence.actions)
+                    first = self._pending_motions.popleft()
+                    self._controller.start(first, self._pose)
+                    self._zero_cycles = 0
+                self._publish_status("accepted_sequence", sequence=sequence.to_dict())
+                if self._interactive:
+                    self._ui.show_intent(first, self._config)
+                else:
+                    self.get_logger().info(
+                        f"Accepted sequence: {sequence.to_dict()}"
+                    )
 
             def _answer_status(self, query: StatusQuery) -> dict[str, object]:
                 if query.kind is StatusKind.ROS_TOPICS:
@@ -332,27 +407,46 @@ class AutoCtrlNode:  # Constructed dynamically so importing the package does not
                 return {"available": True, "voltage_v": voltage}
 
             def _control_tick(self) -> None:
+                next_intent: MotionIntent | None = None
                 with self._lock:
                     was_active = self._controller.active_intent is not None
                     velocity = self._controller.tick(self._pose)
                     is_active = self._controller.active_intent is not None
-                    if was_active and not is_active:
+                    action_completed = was_active and not is_active
+                    if action_completed and self._pending_motions:
+                        next_intent = self._pending_motions.popleft()
+                        self._controller.start(next_intent, self._pose)
+                        is_active = self._controller.active_intent is not None
+                        self._zero_cycles = 0
+                    elif action_completed:
                         self._zero_cycles = max(self._zero_cycles, 3)
                     should_publish = is_active or was_active or self._zero_cycles > 0
                     if not is_active and self._zero_cycles > 0:
                         self._zero_cycles -= 1
                 if should_publish:
                     self._publish_velocity(velocity)
-                if was_active and not is_active:
-                    self._publish_status("completed")
+                if action_completed:
+                    with self._lock:
+                        twin_result = self._twin_monitor.report()
+                    self._publish_status("completed", twin=twin_result)
                     if self._interactive:
                         self._ui.show_completed()
+                if next_intent is not None:
+                    self._publish_status("accepted", intent=next_intent.to_dict())
+                    if self._interactive:
+                        self._ui.show_intent(next_intent, self._config)
+                    else:
+                        self.get_logger().info(
+                            f"Accepted next action: {next_intent.to_dict()}"
+                        )
 
             def _publish_velocity(self, velocity: Velocity) -> None:
                 message = Twist()
                 message.linear.x = velocity.linear_x
                 message.angular.z = velocity.angular_z
                 self._cmd_pub.publish(message)
+                if self._mirror_cmd_pub is not None:
+                    self._mirror_cmd_pub.publish(message)
 
             def _publish_status(self, state: str, **details: object) -> None:
                 message = String()
@@ -388,6 +482,21 @@ class AutoCtrlNode:  # Constructed dynamically so importing the package does not
 
 def _resolve_topic(namespace: str, configured: str) -> str:
     return configured if configured.startswith("/") else _topic(namespace, configured)
+
+
+def _pose_from_odom(message: Any) -> Pose2D:
+    position = message.pose.pose.position
+    orientation = message.pose.pose.orientation
+    return Pose2D(
+        x=float(position.x),
+        y=float(position.y),
+        yaw=_yaw_from_quaternion(
+            orientation.x,
+            orientation.y,
+            orientation.z,
+            orientation.w,
+        ),
+    )
 
 
 if __name__ == "__main__":

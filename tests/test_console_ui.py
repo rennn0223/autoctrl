@@ -43,7 +43,7 @@ class ConsoleUITests(unittest.TestCase):
         )
         self.assertEqual(
             [completion.text for completion in all_commands],
-            ["/doctor", "/exit"],
+            ["/doctor", "/twin", "/exit"],
         )
 
         exit_only = list(
@@ -61,6 +61,7 @@ class ConsoleUITests(unittest.TestCase):
         ).show_header(model="qwen3.6:35b", cmd_vel_topic="/small/cmd_vel")
         rendered = output.getvalue()
         self.assertIn("/doctor", rendered)
+        self.assertIn("/twin", rendered)
         self.assertIn("/exit", rendered)
 
     def test_header_card_is_centered_in_wide_terminal(self) -> None:

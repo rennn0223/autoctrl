@@ -43,6 +43,8 @@ LLM 只負責理解命令並產生結構化移動意圖或唯讀狀態查詢；�
 
 **[Automation 2026 設定與操作手冊](docs/SETUP.md)**
 
+同一個 `autoctrl` 指令會預先建立 Isaac Sim 虛實通道，將命令同步送往實車與 `/sim` 虛擬車，並以 `/twin` 顯示相對位移與朝向誤差。設定方式請參閱 **[虛實同動模式](docs/DIGITAL_TWIN.md)**。
+
 ## 論文與可重現性
 
 Automation 2026 reference artifact：

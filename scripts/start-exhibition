@@ -9,9 +9,15 @@ ROBOT_SSH="${AUTOCTRL_ROBOT_SSH:-wheeltec@100.64.0.5}"
 ROBOT_ZENOH_DIR="${AUTOCTRL_ROBOT_ZENOH_DIR:-/opt/zenoh-bridge}"
 LOCAL_ZENOH_DIR="${AUTOCTRL_LOCAL_ZENOH_DIR:-/opt/zenoh-bridge}"
 ROS_SETUP="${AUTOCTRL_ROS_SETUP:-/opt/ros/jazzy/setup.bash}"
+ISAAC_ROS_SETUP="${ISAAC_ROS_SETUP:-$HOME/IsaacSim-ros_workspaces/jazzy_ws/install/setup.bash}"
 ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-2}"
 ROS_AUTOMATIC_DISCOVERY_RANGE="${ROS_AUTOMATIC_DISCOVERY_RANGE:-LOCALHOST}"
 STARTUP_LOG="${AUTOCTRL_STARTUP_LOG:-/tmp/autoctrl-startup.log}"
+TWIN_MODE="${AUTOCTRL_TWIN_MODE:-auto}"
+SIM_NAMESPACE="${AUTOCTRL_SIM_NAMESPACE:-/sim}"
+TWIN_LOG="${AUTOCTRL_TWIN_LOG:-/tmp/autoctrl-twin.log}"
+TWIN_CONVERTER_PID=""
+TWIN_READY=0
 SKIP_ROBOT=0
 SKIP_BRIDGES=0
 VERBOSE=0
@@ -25,7 +31,9 @@ usage() {
     "  --verbose       顯示 bridge、ROS discovery 與 uv 的完整啟動輸出" \
     "  --help          顯示說明" \
     "" \
-    "一般啟動不等待小車 topics；CLI 會自動執行 /doctor，且失敗不阻止開啟。" \
+    "預設立即準備 /sim 虛實同動通道；Isaac Sim 可在啟動前或啟動後接入。" \
+    "設定 AUTOCTRL_TWIN_MODE=off 可停用；on 與預設模式皆會啟用虛實通道。" \
+    "一般啟動不等待實車 topics；CLI 會自動執行 /doctor，且失敗不阻止開啟。" \
     "完整啟動紀錄預設寫入：$STARTUP_LOG"
 }
 
@@ -69,6 +77,9 @@ fi
 export ROS_DOMAIN_ID ROS_AUTOMATIC_DISCOVERY_RANGE
 set +u
 source "$ROS_SETUP"
+if [[ -f "$ISAAC_ROS_SETUP" ]]; then
+  source "$ISAAC_ROS_SETUP"
+fi
 set -u
 
 : >"$STARTUP_LOG"
@@ -122,6 +133,56 @@ refresh_ros() {
   ros2 daemon start >/dev/null
 }
 
+sim_topic() {
+  printf '/%s/%s' "${SIM_NAMESPACE#/}" "$1"
+}
+
+cleanup_twin_converter() {
+  if [[ -n "$TWIN_CONVERTER_PID" ]] &&
+    kill -0 "$TWIN_CONVERTER_PID" 2>/dev/null; then
+    kill "$TWIN_CONVERTER_PID" 2>/dev/null || true
+    wait "$TWIN_CONVERTER_PID" 2>/dev/null || true
+  fi
+}
+trap cleanup_twin_converter EXIT
+
+configure_digital_twin() {
+  [[ "$TWIN_MODE" != "off" ]] || return 0
+
+  local cmd_vel_topic
+  local ackermann_topic
+  cmd_vel_topic="$(sim_topic cmd_vel)"
+  ackermann_topic="$(sim_topic ackermann_cmd)"
+
+  if pgrep -f '^python3 .*/cmdvel_to_ackermann.py .*__node:=autoctrl_twin_cmdvel_to_ackermann' >/dev/null; then
+    TWIN_READY=1
+    return 0
+  fi
+
+  if ! ros2 pkg executables cmdvel_to_ackermann 2>/dev/null |
+    grep -q 'cmdvel_to_ackermann.py'; then
+    remember_warning "找不到 cmdvel_to_ackermann；未啟用虛實同動"
+    return 0
+  fi
+
+  ros2 run cmdvel_to_ackermann cmdvel_to_ackermann.py --ros-args \
+    -r __node:=autoctrl_twin_cmdvel_to_ackermann \
+    -r /cmd_vel:="$cmd_vel_topic" \
+    -r /ackermann_cmd:="$ackermann_topic" \
+    -p acceleration:=0.5 \
+    -p steering_velocity:=0.5 \
+    >"$TWIN_LOG" 2>&1 &
+  TWIN_CONVERTER_PID=$!
+
+  sleep 0.2
+  if ! kill -0 "$TWIN_CONVERTER_PID" 2>/dev/null; then
+    remember_warning "Isaac Sim Ackermann 轉換器啟動失敗；詳見 $TWIN_LOG"
+    TWIN_CONVERTER_PID=""
+    return 0
+  fi
+  TWIN_READY=1
+}
+
 if ((SKIP_BRIDGES == 0)); then
   if ((SKIP_ROBOT == 0)); then
     run_optional "啟動小車 Zenoh bridge 與底盤 driver" start_robot
@@ -147,6 +208,8 @@ elif ! "$PROJECT_DIR/scripts/bootstrap" >>"$STARTUP_LOG" 2>&1; then
   exit 1
 fi
 
+configure_digital_twin
+
 if ((${#STARTUP_WARNINGS[@]})); then
   printf -v AUTOCTRL_STARTUP_WARNINGS '%s\n' "${STARTUP_WARNINGS[@]}"
   export AUTOCTRL_STARTUP_WARNINGS
@@ -154,4 +217,15 @@ else
   unset AUTOCTRL_STARTUP_WARNINGS || true
 fi
 
-exec "$PROJECT_DIR/scripts/autoctrl-ros" "${ROS_ARGS[@]}"
+NODE_ARGS=("${ROS_ARGS[@]}")
+if ((TWIN_READY)); then
+  if ((${#NODE_ARGS[@]} == 0)) || [[ "${NODE_ARGS[0]}" != "--ros-args" ]]; then
+    NODE_ARGS+=("--ros-args")
+  fi
+  NODE_ARGS+=(
+    "-p" "mirror_cmd_vel_topic:=$(sim_topic cmd_vel)"
+    "-p" "simulation_odom_topic:=$(sim_topic odom)"
+  )
+fi
+
+"$PROJECT_DIR/scripts/autoctrl-ros" "${NODE_ARGS[@]}"
