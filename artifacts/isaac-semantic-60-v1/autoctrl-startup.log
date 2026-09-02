@@ -1,0 +1,195 @@
+[INFO] [1788333489.761102612] [autoctrl]: AutoCtrl ready: command=/autoctrl/eval/command, cmd_vel=/autoctrl/eval/sink_cmd_vel, odom=/autoctrl/eval/sink_odom
+[INFO] [1788333492.384870171] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333492.386238836] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333492.920123007] [autoctrl]: Accepted: {'kind': <MotionKind.MOVE_LINEAR: 'move_linear'>, 'linear_direction': <LinearDirection.FORWARD: 'forward'>, 'duration_s': 2.0, 'source': 'guarded_fast_path', 'original_text': '往前行駛 2 秒'}
+[INFO] [1788333496.773927335] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333496.960414134] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333497.589847161] [autoctrl]: Accepted: {'kind': <MotionKind.MOVE_LINEAR: 'move_linear'>, 'linear_direction': <LinearDirection.FORWARD: 'forward'>, 'duration_s': 2.0, 'source': 'guarded_fast_path', 'original_text': '請朝前方走 2 秒'}
+[INFO] [1788333501.393539548] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333501.561879293] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333502.190967807] [autoctrl]: Accepted: {'kind': <MotionKind.MOVE_LINEAR: 'move_linear'>, 'linear_direction': <LinearDirection.FORWARD: 'forward'>, 'duration_s': 2.0, 'source': 'guarded_fast_path', 'original_text': 'move forward for 2 seconds'}
+[INFO] [1788333506.020370652] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333506.184674753] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333509.271072936] [autoctrl]: Accepted: {'kind': <MotionKind.MOVE_LINEAR: 'move_linear'>, 'linear_direction': <LinearDirection.FORWARD: 'forward'>, 'duration_s': 2.0, 'source': 'ollama', 'original_text': 'drive ahead for 2 seconds'}
+[INFO] [1788333513.068351855] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333513.270572861] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333513.877680569] [autoctrl]: Accepted: {'kind': <MotionKind.MOVE_LINEAR: 'move_linear'>, 'linear_direction': <LinearDirection.BACKWARD: 'backward'>, 'duration_s': 2.0, 'source': 'guarded_fast_path', 'original_text': '往後退 2 秒'}
+[INFO] [1788333517.781170617] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333517.970406333] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333518.537102289] [autoctrl]: Accepted: {'kind': <MotionKind.MOVE_LINEAR: 'move_linear'>, 'linear_direction': <LinearDirection.BACKWARD: 'backward'>, 'duration_s': 2.0, 'source': 'guarded_fast_path', 'original_text': '請倒車 2 秒'}
+[INFO] [1788333522.286713754] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333522.479868714] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333523.087467291] [autoctrl]: Accepted: {'kind': <MotionKind.MOVE_LINEAR: 'move_linear'>, 'linear_direction': <LinearDirection.BACKWARD: 'backward'>, 'duration_s': 2.0, 'source': 'guarded_fast_path', 'original_text': 'move backward for 2 seconds'}
+[INFO] [1788333526.881086685] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333527.084690965] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333530.265173362] [autoctrl]: Accepted: {'kind': <MotionKind.MOVE_LINEAR: 'move_linear'>, 'linear_direction': <LinearDirection.BACKWARD: 'backward'>, 'duration_s': 2.0, 'source': 'ollama', 'original_text': 'reverse for 2 seconds'}
+[INFO] [1788333534.011945464] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333534.226203835] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333534.838827250] [autoctrl]: Accepted: {'kind': <MotionKind.ROTATE: 'rotate'>, 'turn_direction': <TurnDirection.LEFT: 'left'>, 'duration_s': 2.0, 'source': 'guarded_fast_path', 'original_text': '往左轉 2 秒'}
+[INFO] [1788333538.564009431] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333538.759986683] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333539.407041395] [autoctrl]: Accepted: {'kind': <MotionKind.ROTATE: 'rotate'>, 'turn_direction': <TurnDirection.LEFT: 'left'>, 'duration_s': 2.0, 'source': 'guarded_fast_path', 'original_text': '請向左轉彎 2 秒'}
+[INFO] [1788333543.128952696] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333543.389428573] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333544.022896791] [autoctrl]: Accepted: {'kind': <MotionKind.ROTATE: 'rotate'>, 'turn_direction': <TurnDirection.LEFT: 'left'>, 'duration_s': 2.0, 'source': 'guarded_fast_path', 'original_text': 'turn left for 2 seconds'}
+[INFO] [1788333547.854243388] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333548.048681926] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333548.648643656] [autoctrl]: Accepted: {'kind': <MotionKind.ROTATE: 'rotate'>, 'turn_direction': <TurnDirection.LEFT: 'left'>, 'duration_s': 2.0, 'source': 'guarded_fast_path', 'original_text': 'steer left for 2 seconds'}
+[INFO] [1788333552.398358843] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333552.595623497] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333553.154147611] [autoctrl]: Accepted: {'kind': <MotionKind.ROTATE: 'rotate'>, 'turn_direction': <TurnDirection.RIGHT: 'right'>, 'duration_s': 2.0, 'source': 'guarded_fast_path', 'original_text': '往右轉 2 秒'}
+[INFO] [1788333557.007903304] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333557.146374045] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333557.816280440] [autoctrl]: Accepted: {'kind': <MotionKind.ROTATE: 'rotate'>, 'turn_direction': <TurnDirection.RIGHT: 'right'>, 'duration_s': 2.0, 'source': 'guarded_fast_path', 'original_text': '請向右轉彎 2 秒'}
+[INFO] [1788333561.646520248] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333561.867532060] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333562.448258203] [autoctrl]: Accepted: {'kind': <MotionKind.ROTATE: 'rotate'>, 'turn_direction': <TurnDirection.RIGHT: 'right'>, 'duration_s': 2.0, 'source': 'guarded_fast_path', 'original_text': 'turn right for 2 seconds'}
+[INFO] [1788333566.414856567] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333566.694557796] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333567.192556227] [autoctrl]: Accepted: {'kind': <MotionKind.ROTATE: 'rotate'>, 'turn_direction': <TurnDirection.RIGHT: 'right'>, 'duration_s': 2.0, 'source': 'guarded_fast_path', 'original_text': 'steer right for 2 seconds'}
+[INFO] [1788333571.057265472] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333571.455339735] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333571.956009065] [autoctrl]: Accepted: {'kind': <MotionKind.MOVE_LINEAR: 'move_linear'>, 'linear_direction': <LinearDirection.FORWARD: 'forward'>, 'source': 'guarded_fast_path', 'original_text': '持續往前走'}
+[INFO] [1788333572.513778618] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333573.349210859] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333573.552870903] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333574.243398614] [autoctrl]: Accepted: {'kind': <MotionKind.MOVE_LINEAR: 'move_linear'>, 'linear_direction': <LinearDirection.FORWARD: 'forward'>, 'source': 'guarded_fast_path', 'original_text': '往前持續行駛'}
+[INFO] [1788333574.854732076] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '請停下來'}
+[INFO] [1788333575.909261413] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333576.135142556] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333576.722753998] [autoctrl]: Accepted: {'kind': <MotionKind.MOVE_LINEAR: 'move_linear'>, 'linear_direction': <LinearDirection.FORWARD: 'forward'>, 'source': 'guarded_fast_path', 'original_text': 'move forward continuously'}
+[INFO] [1788333577.326066925] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': 'stop'}
+[INFO] [1788333578.352181089] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333578.457452959] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333579.010794082] [autoctrl]: Accepted: {'kind': <MotionKind.MOVE_LINEAR: 'move_linear'>, 'linear_direction': <LinearDirection.FORWARD: 'forward'>, 'source': 'guarded_fast_path', 'original_text': 'keep moving forward'}
+[INFO] [1788333579.555034582] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': 'bring the vehicle to a stop'}
+[INFO] [1788333580.730163290] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333580.934337034] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333581.552139375] [autoctrl]: Accepted: {'kind': <MotionKind.MOVE_LINEAR: 'move_linear'>, 'linear_direction': <LinearDirection.FORWARD: 'forward'>, 'duration_s': 2.0, 'source': 'guarded_fast_path', 'original_text': '往前行駛 2 秒'}
+[INFO] [1788333585.367827832] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333585.585636327] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333586.186937226] [autoctrl]: Accepted: {'kind': <MotionKind.MOVE_LINEAR: 'move_linear'>, 'linear_direction': <LinearDirection.FORWARD: 'forward'>, 'duration_s': 2.0, 'source': 'guarded_fast_path', 'original_text': '請朝前方走 2 秒'}
+[INFO] [1788333590.102873908] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333590.198111213] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333590.940000646] [autoctrl]: Accepted: {'kind': <MotionKind.MOVE_LINEAR: 'move_linear'>, 'linear_direction': <LinearDirection.FORWARD: 'forward'>, 'duration_s': 2.0, 'source': 'guarded_fast_path', 'original_text': 'move forward for 2 seconds'}
+[INFO] [1788333594.860416069] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333595.030580649] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333598.308948987] [autoctrl]: Accepted: {'kind': <MotionKind.MOVE_LINEAR: 'move_linear'>, 'linear_direction': <LinearDirection.FORWARD: 'forward'>, 'duration_s': 2.0, 'source': 'ollama', 'original_text': 'drive ahead for 2 seconds'}
+[INFO] [1788333602.195799658] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333602.356676461] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333603.184476865] [autoctrl]: Accepted: {'kind': <MotionKind.MOVE_LINEAR: 'move_linear'>, 'linear_direction': <LinearDirection.BACKWARD: 'backward'>, 'duration_s': 2.0, 'source': 'guarded_fast_path', 'original_text': '往後退 2 秒'}
+[INFO] [1788333607.121772964] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333607.308467740] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333607.889625542] [autoctrl]: Accepted: {'kind': <MotionKind.MOVE_LINEAR: 'move_linear'>, 'linear_direction': <LinearDirection.BACKWARD: 'backward'>, 'duration_s': 2.0, 'source': 'guarded_fast_path', 'original_text': '請倒車 2 秒'}
+[INFO] [1788333611.878319095] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333611.942422455] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333612.642353680] [autoctrl]: Accepted: {'kind': <MotionKind.MOVE_LINEAR: 'move_linear'>, 'linear_direction': <LinearDirection.BACKWARD: 'backward'>, 'duration_s': 2.0, 'source': 'guarded_fast_path', 'original_text': 'move backward for 2 seconds'}
+[INFO] [1788333616.486937257] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333616.627710560] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333619.749759061] [autoctrl]: Accepted: {'kind': <MotionKind.MOVE_LINEAR: 'move_linear'>, 'linear_direction': <LinearDirection.BACKWARD: 'backward'>, 'duration_s': 2.0, 'source': 'ollama', 'original_text': 'reverse for 2 seconds'}
+[INFO] [1788333623.535089320] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333623.740112544] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333624.307568350] [autoctrl]: Accepted: {'kind': <MotionKind.ROTATE: 'rotate'>, 'turn_direction': <TurnDirection.LEFT: 'left'>, 'duration_s': 2.0, 'source': 'guarded_fast_path', 'original_text': '往左轉 2 秒'}
+[INFO] [1788333628.100965695] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333628.339931861] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333628.908513899] [autoctrl]: Accepted: {'kind': <MotionKind.ROTATE: 'rotate'>, 'turn_direction': <TurnDirection.LEFT: 'left'>, 'duration_s': 2.0, 'source': 'guarded_fast_path', 'original_text': '請向左轉彎 2 秒'}
+[INFO] [1788333632.770106654] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333632.926632052] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333633.506687003] [autoctrl]: Accepted: {'kind': <MotionKind.ROTATE: 'rotate'>, 'turn_direction': <TurnDirection.LEFT: 'left'>, 'duration_s': 2.0, 'source': 'guarded_fast_path', 'original_text': 'turn left for 2 seconds'}
+[INFO] [1788333637.298734061] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333637.508671145] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333638.112123364] [autoctrl]: Accepted: {'kind': <MotionKind.ROTATE: 'rotate'>, 'turn_direction': <TurnDirection.LEFT: 'left'>, 'duration_s': 2.0, 'source': 'guarded_fast_path', 'original_text': 'steer left for 2 seconds'}
+[INFO] [1788333641.965757306] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333642.166997305] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333642.773413706] [autoctrl]: Accepted: {'kind': <MotionKind.ROTATE: 'rotate'>, 'turn_direction': <TurnDirection.RIGHT: 'right'>, 'duration_s': 2.0, 'source': 'guarded_fast_path', 'original_text': '往右轉 2 秒'}
+[INFO] [1788333646.823029408] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333647.012538414] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333647.615134549] [autoctrl]: Accepted: {'kind': <MotionKind.ROTATE: 'rotate'>, 'turn_direction': <TurnDirection.RIGHT: 'right'>, 'duration_s': 2.0, 'source': 'guarded_fast_path', 'original_text': '請向右轉彎 2 秒'}
+[INFO] [1788333651.511976819] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333651.679690953] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333652.295248892] [autoctrl]: Accepted: {'kind': <MotionKind.ROTATE: 'rotate'>, 'turn_direction': <TurnDirection.RIGHT: 'right'>, 'duration_s': 2.0, 'source': 'guarded_fast_path', 'original_text': 'turn right for 2 seconds'}
+[INFO] [1788333655.995551424] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333656.175988703] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333656.776035590] [autoctrl]: Accepted: {'kind': <MotionKind.ROTATE: 'rotate'>, 'turn_direction': <TurnDirection.RIGHT: 'right'>, 'duration_s': 2.0, 'source': 'guarded_fast_path', 'original_text': 'steer right for 2 seconds'}
+[INFO] [1788333660.527256931] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333660.727883215] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333661.382039698] [autoctrl]: Accepted: {'kind': <MotionKind.MOVE_LINEAR: 'move_linear'>, 'linear_direction': <LinearDirection.FORWARD: 'forward'>, 'source': 'guarded_fast_path', 'original_text': '持續往前走'}
+[INFO] [1788333661.971631457] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333662.989776168] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333663.227207222] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333663.797099995] [autoctrl]: Accepted: {'kind': <MotionKind.MOVE_LINEAR: 'move_linear'>, 'linear_direction': <LinearDirection.FORWARD: 'forward'>, 'source': 'guarded_fast_path', 'original_text': '往前持續行駛'}
+[INFO] [1788333664.340855689] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '請停下來'}
+[INFO] [1788333665.223238746] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333665.467390599] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333666.126558414] [autoctrl]: Accepted: {'kind': <MotionKind.MOVE_LINEAR: 'move_linear'>, 'linear_direction': <LinearDirection.FORWARD: 'forward'>, 'source': 'guarded_fast_path', 'original_text': 'move forward continuously'}
+[INFO] [1788333666.679848847] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': 'stop'}
+[INFO] [1788333667.629438472] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333668.028000350] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333668.572862149] [autoctrl]: Accepted: {'kind': <MotionKind.MOVE_LINEAR: 'move_linear'>, 'linear_direction': <LinearDirection.FORWARD: 'forward'>, 'source': 'guarded_fast_path', 'original_text': 'keep moving forward'}
+[INFO] [1788333669.191654865] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': 'bring the vehicle to a stop'}
+[INFO] [1788333670.094394450] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333670.288104398] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333670.898748498] [autoctrl]: Accepted: {'kind': <MotionKind.MOVE_LINEAR: 'move_linear'>, 'linear_direction': <LinearDirection.FORWARD: 'forward'>, 'duration_s': 2.0, 'source': 'guarded_fast_path', 'original_text': '往前行駛 2 秒'}
+[INFO] [1788333674.682724964] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333674.895652999] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333675.498421316] [autoctrl]: Accepted: {'kind': <MotionKind.MOVE_LINEAR: 'move_linear'>, 'linear_direction': <LinearDirection.FORWARD: 'forward'>, 'duration_s': 2.0, 'source': 'guarded_fast_path', 'original_text': '請朝前方走 2 秒'}
+[INFO] [1788333679.249115969] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333679.514040401] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333680.044299043] [autoctrl]: Accepted: {'kind': <MotionKind.MOVE_LINEAR: 'move_linear'>, 'linear_direction': <LinearDirection.FORWARD: 'forward'>, 'duration_s': 2.0, 'source': 'guarded_fast_path', 'original_text': 'move forward for 2 seconds'}
+[INFO] [1788333683.923486841] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333684.119855449] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333687.255981645] [autoctrl]: Accepted: {'kind': <MotionKind.MOVE_LINEAR: 'move_linear'>, 'linear_direction': <LinearDirection.FORWARD: 'forward'>, 'duration_s': 2.0, 'source': 'ollama', 'original_text': 'drive ahead for 2 seconds'}
+[INFO] [1788333691.143737175] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333691.383037508] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333692.092490095] [autoctrl]: Accepted: {'kind': <MotionKind.MOVE_LINEAR: 'move_linear'>, 'linear_direction': <LinearDirection.BACKWARD: 'backward'>, 'duration_s': 2.0, 'source': 'guarded_fast_path', 'original_text': '往後退 2 秒'}
+[INFO] [1788333695.833309784] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333696.032206698] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333696.648897436] [autoctrl]: Accepted: {'kind': <MotionKind.MOVE_LINEAR: 'move_linear'>, 'linear_direction': <LinearDirection.BACKWARD: 'backward'>, 'duration_s': 2.0, 'source': 'guarded_fast_path', 'original_text': '請倒車 2 秒'}
+[INFO] [1788333700.423737896] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333700.643826015] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333701.304323445] [autoctrl]: Accepted: {'kind': <MotionKind.MOVE_LINEAR: 'move_linear'>, 'linear_direction': <LinearDirection.BACKWARD: 'backward'>, 'duration_s': 2.0, 'source': 'guarded_fast_path', 'original_text': 'move backward for 2 seconds'}
+[INFO] [1788333705.191949165] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333705.367736685] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333708.446542577] [autoctrl]: Accepted: {'kind': <MotionKind.MOVE_LINEAR: 'move_linear'>, 'linear_direction': <LinearDirection.BACKWARD: 'backward'>, 'duration_s': 2.0, 'source': 'ollama', 'original_text': 'reverse for 2 seconds'}
+[INFO] [1788333712.338508925] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333712.541907280] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333713.150087369] [autoctrl]: Accepted: {'kind': <MotionKind.ROTATE: 'rotate'>, 'turn_direction': <TurnDirection.LEFT: 'left'>, 'duration_s': 2.0, 'source': 'guarded_fast_path', 'original_text': '往左轉 2 秒'}
+[INFO] [1788333716.930089961] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333717.115858240] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333717.755846345] [autoctrl]: Accepted: {'kind': <MotionKind.ROTATE: 'rotate'>, 'turn_direction': <TurnDirection.LEFT: 'left'>, 'duration_s': 2.0, 'source': 'guarded_fast_path', 'original_text': '請向左轉彎 2 秒'}
+[INFO] [1788333721.545964981] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333721.784216556] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333722.396411603] [autoctrl]: Accepted: {'kind': <MotionKind.ROTATE: 'rotate'>, 'turn_direction': <TurnDirection.LEFT: 'left'>, 'duration_s': 2.0, 'source': 'guarded_fast_path', 'original_text': 'turn left for 2 seconds'}
+[INFO] [1788333726.155308216] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333726.363859552] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333726.965381292] [autoctrl]: Accepted: {'kind': <MotionKind.ROTATE: 'rotate'>, 'turn_direction': <TurnDirection.LEFT: 'left'>, 'duration_s': 2.0, 'source': 'guarded_fast_path', 'original_text': 'steer left for 2 seconds'}
+[INFO] [1788333730.741055739] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333730.960683008] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333731.547980426] [autoctrl]: Accepted: {'kind': <MotionKind.ROTATE: 'rotate'>, 'turn_direction': <TurnDirection.RIGHT: 'right'>, 'duration_s': 2.0, 'source': 'guarded_fast_path', 'original_text': '往右轉 2 秒'}
+[INFO] [1788333735.440889652] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333735.650795349] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333736.244348715] [autoctrl]: Accepted: {'kind': <MotionKind.ROTATE: 'rotate'>, 'turn_direction': <TurnDirection.RIGHT: 'right'>, 'duration_s': 2.0, 'source': 'guarded_fast_path', 'original_text': '請向右轉彎 2 秒'}
+[INFO] [1788333739.982513691] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333740.264463239] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333740.811067476] [autoctrl]: Accepted: {'kind': <MotionKind.ROTATE: 'rotate'>, 'turn_direction': <TurnDirection.RIGHT: 'right'>, 'duration_s': 2.0, 'source': 'guarded_fast_path', 'original_text': 'turn right for 2 seconds'}
+[INFO] [1788333744.667719112] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333744.887585952] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333745.646600881] [autoctrl]: Accepted: {'kind': <MotionKind.ROTATE: 'rotate'>, 'turn_direction': <TurnDirection.RIGHT: 'right'>, 'duration_s': 2.0, 'source': 'guarded_fast_path', 'original_text': 'steer right for 2 seconds'}
+[INFO] [1788333749.354711190] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333749.528424586] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333750.139436413] [autoctrl]: Accepted: {'kind': <MotionKind.MOVE_LINEAR: 'move_linear'>, 'linear_direction': <LinearDirection.FORWARD: 'forward'>, 'source': 'guarded_fast_path', 'original_text': '持續往前走'}
+[INFO] [1788333750.693849602] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333751.624942346] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333751.888850390] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333752.413647162] [autoctrl]: Accepted: {'kind': <MotionKind.MOVE_LINEAR: 'move_linear'>, 'linear_direction': <LinearDirection.FORWARD: 'forward'>, 'source': 'guarded_fast_path', 'original_text': '往前持續行駛'}
+[INFO] [1788333752.992278119] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '請停下來'}
+[INFO] [1788333753.790072750] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333753.992611696] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333754.600612564] [autoctrl]: Accepted: {'kind': <MotionKind.MOVE_LINEAR: 'move_linear'>, 'linear_direction': <LinearDirection.FORWARD: 'forward'>, 'source': 'guarded_fast_path', 'original_text': 'move forward continuously'}
+[INFO] [1788333755.165784764] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': 'stop'}
+[INFO] [1788333756.218453356] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333756.418573085] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333757.067428715] [autoctrl]: Accepted: {'kind': <MotionKind.MOVE_LINEAR: 'move_linear'>, 'linear_direction': <LinearDirection.FORWARD: 'forward'>, 'source': 'guarded_fast_path', 'original_text': 'keep moving forward'}
+[INFO] [1788333757.614886461] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': 'bring the vehicle to a stop'}
+[INFO] [1788333758.544673054] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}
+[INFO] [1788333758.745459987] [autoctrl]: Accepted: {'kind': <MotionKind.STOP: 'stop'>, 'source': 'guarded_fast_path', 'original_text': '停'}

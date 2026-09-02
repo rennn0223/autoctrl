@@ -1,0 +1,22 @@
+{
+  "timestamp": "2026-09-02T15:22:39.169920+08:00",
+  "git_commit": "50a50a01917195153396308b7653e9de92b8fca9",
+  "git_dirty": false,
+  "model": "qwen3.6:35b",
+  "ollama_version": "ollama version is 0.23.4",
+  "python_version": "3.12.3",
+  "ros_domain_id": "2",
+  "cases_path": "/home/nvidia/autoctrl/tests/corpus/isaac_semantic_commands.csv",
+  "cases_sha256": "563bc003893eff3d0b5c333c1212274c5e139b9de505eba5de02c37f3e7264b6",
+  "case_count": 20,
+  "repetitions": 3,
+  "trial_count": 60,
+  "with_real": false,
+  "simulation_cmd_vel_topic": "/sim/cmd_vel",
+  "simulation_odom_topic": "/sim/odom",
+  "real_odom_topic": null,
+  "minimum_displacement_m": 0.01,
+  "minimum_yaw_deg": 1.0,
+  "settled_speed_mps": 0.02,
+  "note": "MotionSequence is outside this single-command integration corpus."
+}
