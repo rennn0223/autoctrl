@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+PROJECT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$PROJECT_DIR"
+
+ROS_SETUP="${AUTOCTRL_ROS_SETUP:-/opt/ros/jazzy/setup.bash}"
+ISAAC_ROS_SETUP="${ISAAC_ROS_SETUP:-$HOME/IsaacSim-ros_workspaces/jazzy_ws/install/setup.bash}"
+export ROS_AUTOMATIC_DISCOVERY_RANGE="${ROS_AUTOMATIC_DISCOVERY_RANGE:-LOCALHOST}"
+export ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-2}"
+set +u
+source "$ROS_SETUP"
+if [[ -f "$ISAAC_ROS_SETUP" ]]; then
+  source "$ISAAC_ROS_SETUP"
+fi
+set -u
+
+exec uv run autoctrl-isaac-eval "$@"

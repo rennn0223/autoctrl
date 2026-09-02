@@ -1,0 +1,21 @@
+id,text,language,scenario,expected_kind,expected_direction,duration_s,setup_text
+forward-zh-01,往前行駛 2 秒,zh,timed_motion,move_linear,forward,2.0,
+forward-zh-02,請朝前方走 2 秒,zh,timed_motion,move_linear,forward,2.0,
+forward-en-01,move forward for 2 seconds,en,timed_motion,move_linear,forward,2.0,
+forward-en-02,drive ahead for 2 seconds,en,timed_motion,move_linear,forward,2.0,
+backward-zh-01,往後退 2 秒,zh,timed_motion,move_linear,backward,2.0,
+backward-zh-02,請倒車 2 秒,zh,timed_motion,move_linear,backward,2.0,
+backward-en-01,move backward for 2 seconds,en,timed_motion,move_linear,backward,2.0,
+backward-en-02,reverse for 2 seconds,en,timed_motion,move_linear,backward,2.0,
+left-zh-01,往左轉 2 秒,zh,timed_motion,rotate,left,2.0,
+left-zh-02,請向左轉彎 2 秒,zh,timed_motion,rotate,left,2.0,
+left-en-01,turn left for 2 seconds,en,timed_motion,rotate,left,2.0,
+left-en-02,steer left for 2 seconds,en,timed_motion,rotate,left,2.0,
+right-zh-01,往右轉 2 秒,zh,timed_motion,rotate,right,2.0,
+right-zh-02,請向右轉彎 2 秒,zh,timed_motion,rotate,right,2.0,
+right-en-01,turn right for 2 seconds,en,timed_motion,rotate,right,2.0,
+right-en-02,steer right for 2 seconds,en,timed_motion,rotate,right,2.0,
+stop-zh-01,停,zh,stop,stop,stop,,持續往前走
+stop-zh-02,請停下來,zh,stop,stop,stop,,往前持續行駛
+stop-en-01,stop,en,stop,stop,stop,,move forward continuously
+stop-en-02,bring the vehicle to a stop,en,stop,stop,stop,,keep moving forward
