@@ -10,6 +10,7 @@ dependencies = ["prompt-toolkit>=3.0,<4", "rich>=13,<15"]
 [project.scripts]
 autoctrl = "autoctrl.cli:main"
 autoctrl-eval = "autoctrl.evaluation:main"
+autoctrl-isaac-eval = "autoctrl.isaac_evaluation:main"
 autoctrl-ros = "autoctrl.ros_node:main"
 
 [build-system]

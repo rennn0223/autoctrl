@@ -52,8 +52,10 @@ Automation 2026 reference artifact：
 - [評估重現指南](docs/EVALUATION.md)
 - [Guarded Hybrid 設計規格](docs/GUARD_DESIGN.md)
 - [完整可重現性與證據限制](docs/REPRODUCIBILITY.md)
+- [Isaac Sim 語意到動作整合評估](docs/ISAAC_EVALUATION.md)
 - [320 句雙語評估語料](tests/corpus/commands_320.csv)
 - [Automation 2026 正式 benchmark CSV、逐句預測與 metadata](artifacts/automation2026-eval-v1)
+- [Isaac Sim 60-trial 語意到動作 reference artifact](artifacts/isaac-semantic-60-v1)
 - [MacBook 論文工作交接](docs/MACBOOK_HANDOFF.md)
 
 正式 benchmark 只測文字解析，不匯入 ROS、不建立 publisher，也不發布 `/cmd_vel`。

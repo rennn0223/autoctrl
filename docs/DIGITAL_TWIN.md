@@ -46,3 +46,8 @@ AUTOCTRL_TWIN_MODE=off autoctrl
 可查看實車位移、模擬位移、位移差與朝向差。`/twin` 只讀取目前遙測，不會開啟、關閉或改變 Twin 模式。這些數值是兩個 odom frame 內的相對運動比較，不代表兩邊共享同一個絕對世界座標。
 
 此功能可描述為 command-level virtual–physical co-motion。若要主張高精度 digital twin synchronization，仍須執行固定路徑的重複試驗並報告誤差分布、延遲與失敗案例。
+
+
+## 自動化整合評估
+
+以固定雙語語料自動發布自然語言、比對 `/sim/cmd_vel` 並由 `/sim/odom` 判定動作方向與延遲的程序，請參閱 [Isaac Sim 語意到動作整合評估](ISAAC_EVALUATION.md)。評估器預設只驅動模擬器；必須明確加入 `--with-real` 才會控制實車。
