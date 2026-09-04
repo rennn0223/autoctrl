@@ -7,7 +7,7 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from .domain import CommandRequest, ConversationReply
-from .skills import SkillError, SkillRegistry, SkillRisk
+from .skills import SkillError, SkillPolicy, SkillRegistry, SkillRisk
 
 
 class InterpretationError(RuntimeError):
@@ -28,6 +28,7 @@ class OllamaInterpreter:
         seed: int = 42,
         transport: Transport | None = None,
         skills: SkillRegistry | None = None,
+        skill_policy: SkillPolicy | None = None,
     ) -> None:
         self.model = model
         self.base_url = base_url.rstrip("/")
@@ -36,6 +37,8 @@ class OllamaInterpreter:
         self.seed = seed
         self._transport = transport or self._http_transport
         self._skills = skills or SkillRegistry.builtins()
+        self._skill_policy = skill_policy or SkillPolicy.allow_all()
+        self._skills.validate_policy(self._skill_policy)
         stop = next(
             (spec for spec in self._skills.specs if spec.name == "stop_vehicle"),
             None,
@@ -61,7 +64,7 @@ class OllamaInterpreter:
                         "若指定執行秒數，使用 duration_s，且不可同時指定 distance_m。"
                         "左轉或右轉未指定角度時省略 angle_deg，代表沿弧線持續轉彎直到使用者說停止。"
                         "轉向若指定執行秒數，使用 duration_s，且不可同時指定 angle_deg。"
-                        "使用者詢問 ROS topics、目前位置或電池電壓時，呼叫對應的唯讀查詢工具。"
+                        "使用者詢問 ROS topics、目前位置、電池電壓或虛實同動差異時，呼叫對應的唯讀查詢工具。"
                         "一次只選擇一個最符合使用者主要意圖的工具。"
                         "若只是問候或一般聊天，請簡短自然回覆，不要呼叫任何工具。"
                         "系統不具備目的地導航或燈光控制；遇到此類要求不得改用狀態查詢或移動工具。"
@@ -71,7 +74,7 @@ class OllamaInterpreter:
                 },
                 {"role": "user", "content": text},
             ],
-            "tools": self._skills.ollama_tools(),
+            "tools": self._skills.ollama_tools(self._skill_policy),
         }
         response = self._transport(payload)
         message = response.get("message", {})
@@ -96,7 +99,9 @@ class OllamaInterpreter:
         if not isinstance(arguments, dict):
             raise InterpretationError("模型工具參數格式錯誤")
         try:
-            return self._skills.resolve(str(name), arguments, text)
+            return self._skills.resolve(
+                str(name), arguments, text, self._skill_policy
+            )
         except SkillError as exc:
             raise InterpretationError(str(exc)) from exc
 

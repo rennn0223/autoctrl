@@ -4,7 +4,11 @@ from collections.abc import Callable, Mapping, Sequence
 from copy import deepcopy
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from .policy import SkillPolicy
+
 
 from ..domain import (
     CommandRequest,
@@ -32,6 +36,10 @@ class SkillNotFoundError(SkillError):
 
 
 class SkillArgumentsError(SkillError):
+    pass
+
+
+class SkillPermissionError(SkillError):
     pass
 
 
@@ -99,18 +107,34 @@ class SkillRegistry:
             for skill in self._skills.values()
         )
 
-    def ollama_tools(self) -> list[dict[str, Any]]:
-        return [skill.spec.as_ollama_tool() for skill in self._skills.values()]
+    def validate_policy(self, policy: SkillPolicy) -> None:
+        if policy.enabled_names is None:
+            return
+        unknown = policy.enabled_names - self._skills.keys()
+        if unknown:
+            raise SkillPermissionError(
+                f"允許清單包含未知 Skill: {', '.join(sorted(unknown))}"
+            )
+
+    def ollama_tools(self, policy: SkillPolicy | None = None) -> list[dict[str, Any]]:
+        return [
+            skill.spec.as_ollama_tool()
+            for skill in self._skills.values()
+            if policy is None or policy.allows(skill.spec.name, skill.spec.risk)
+        ]
 
     def resolve(
         self,
         name: str,
         arguments: Mapping[str, Any],
         original_text: str,
+        policy: SkillPolicy | None = None,
     ) -> CommandRequest:
         skill = self._skills.get(name)
         if skill is None:
             raise SkillNotFoundError(f"未知 Skill: {name}")
+        if policy is not None and not policy.allows(skill.spec.name, skill.spec.risk):
+            raise SkillPermissionError(f"Skill 未被目前策略允許: {name}")
         try:
             return skill.resolve(arguments, original_text)
         except SkillError:
@@ -198,6 +222,11 @@ def _builtin_skills() -> tuple[SkillDefinition, ...]:
             "query_battery_voltage",
             "唯讀查詢小車目前回報的電池電壓；不推測未校正的電量百分比。",
             StatusKind.BATTERY_VOLTAGE,
+        ),
+        (
+            "query_twin_status",
+            "唯讀查詢實體車與 Isaac Sim 的相對位移差及朝向差。",
+            StatusKind.TWIN_STATUS,
         ),
     )
     skills = [

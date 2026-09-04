@@ -20,6 +20,7 @@ class SkillRegistryTests(unittest.TestCase):
                 "query_ros_topics",
                 "query_robot_pose",
                 "query_battery_voltage",
+                "query_twin_status",
                 "move_linear",
                 "rotate_vehicle",
                 "stop_vehicle",
@@ -66,6 +67,10 @@ class SkillRegistryTests(unittest.TestCase):
     def test_resolves_read_only_status(self) -> None:
         request = self.registry.resolve("query_robot_pose", {}, "現在在哪裡")
         self.assertEqual(request.kind, StatusKind.ROBOT_POSE)
+
+    def test_resolves_twin_status_as_read_only_query(self) -> None:
+        request = self.registry.resolve("query_twin_status", {}, "虛實差多少")
+        self.assertEqual(request.kind, StatusKind.TWIN_STATUS)
 
     def test_rejects_unknown_skill(self) -> None:
         with self.assertRaises(SkillNotFoundError):

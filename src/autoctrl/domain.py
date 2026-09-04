@@ -25,6 +25,7 @@ class StatusKind(StrEnum):
     ROS_TOPICS = "ros_topics"
     ROBOT_POSE = "robot_pose"
     BATTERY_VOLTAGE = "battery_voltage"
+    TWIN_STATUS = "twin_status"
 
 
 @dataclass(frozen=True, slots=True)

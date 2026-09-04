@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import queue
 import sys
 import threading
@@ -28,6 +29,7 @@ from .interpreter import HybridInterpreter
 from .motion import MotionConfig, MotionController, Pose2D, Velocity
 from .ollama import InterpretationError, OllamaInterpreter
 from .sequence import SequentialInterpreter
+from .skills import SkillPolicy
 from .twin import TwinMonitor
 
 
@@ -99,6 +101,10 @@ class AutoCtrlNode:  # Constructed dynamically so importing the package does not
                 self.declare_parameter("control_hz", 20.0)
                 self.declare_parameter("model", "qwen3.6:35b")
                 self.declare_parameter("ollama_url", "http://127.0.0.1:11434")
+                self.declare_parameter(
+                    "llm_enabled_skills",
+                    os.environ.get("AUTOCTRL_LLM_SKILLS", "*"),
+                )
                 self.declare_parameter("doctor_startup_delay_s", 0.0)
                 self.declare_parameter("doctor_timeout_s", 2.0)
                 self.declare_parameter("zenoh_container_name", "zenoh-bridge")
@@ -129,6 +135,9 @@ class AutoCtrlNode:  # Constructed dynamically so importing the package does not
                 ollama = OllamaInterpreter(
                     model=model,
                     base_url=str(self.get_parameter("ollama_url").value),
+                    skill_policy=SkillPolicy.from_csv(
+                        str(self.get_parameter("llm_enabled_skills").value)
+                    ),
                 )
                 self._interpreter = SequentialInterpreter(
                     HybridInterpreter(ollama=ollama)
@@ -370,6 +379,10 @@ class AutoCtrlNode:  # Constructed dynamically so importing the package does not
                     )
 
             def _answer_status(self, query: StatusQuery) -> dict[str, object]:
+                if query.kind is StatusKind.TWIN_STATUS:
+                    with self._lock:
+                        return self._twin_monitor.report()
+
                 if query.kind is StatusKind.ROS_TOPICS:
                     prefix = self._robot_namespace.rstrip("/") + "/"
                     topics = [
