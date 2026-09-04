@@ -1,7 +1,15 @@
 import unittest
 
 from autoctrl.ollama import InterpretationError, OllamaInterpreter
-from autoctrl.skills import SkillPermissionError, SkillPolicy, SkillRegistry
+from autoctrl.domain import MotionIntent
+from autoctrl.skills import (
+    SkillDefinition,
+    SkillPermissionError,
+    SkillPolicy,
+    SkillRegistry,
+    SkillRisk,
+    SkillSpec,
+)
 
 
 class SkillPolicyTests(unittest.TestCase):
@@ -14,6 +22,43 @@ class SkillPolicyTests(unittest.TestCase):
         registry = SkillRegistry.builtins()
         policy = SkillPolicy.from_csv("query_ros_topics")
         names = [tool["function"]["name"] for tool in registry.ollama_tools(policy)]
+        self.assertEqual(names, ["query_ros_topics", "stop_vehicle"])
+
+    def test_only_named_stop_skill_bypasses_allowlist(self) -> None:
+        critical = SkillDefinition(
+            spec=SkillSpec(
+                name="critical_demo",
+                description="must still be allowlisted",
+                risk=SkillRisk.MOTION_CRITICAL,
+                input_schema={
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": False,
+                },
+            ),
+            resolve=lambda _arguments, text: MotionIntent.stop(
+                source="test", original_text=text
+            ),
+        )
+        builtins = SkillRegistry.builtins()
+        registry = SkillRegistry(
+            tuple(
+                SkillDefinition(
+                    spec=spec,
+                    resolve=(
+                        lambda arguments, text, name=spec.name: builtins.resolve(
+                            name, arguments, text
+                        )
+                    ),
+                )
+                for spec in builtins.specs
+            )
+            + (critical,)
+        )
+        names = [
+            tool["function"]["name"]
+            for tool in registry.ollama_tools(SkillPolicy.from_csv("query_ros_topics"))
+        ]
         self.assertEqual(names, ["query_ros_topics", "stop_vehicle"])
 
     def test_unknown_allowlist_entry_fails_early(self) -> None:

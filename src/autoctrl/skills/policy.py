@@ -24,6 +24,6 @@ class SkillPolicy:
         return cls(enabled_names=names)
 
     def allows(self, name: str, risk: SkillRisk) -> bool:
-        if risk is SkillRisk.MOTION_CRITICAL:
+        if name == "stop_vehicle" and risk is SkillRisk.MOTION_CRITICAL:
             return True
         return self.enabled_names is None or name in self.enabled_names

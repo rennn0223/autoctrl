@@ -72,6 +72,24 @@ class SkillRegistryTests(unittest.TestCase):
         request = self.registry.resolve("query_twin_status", {}, "虛實差多少")
         self.assertEqual(request.kind, StatusKind.TWIN_STATUS)
 
+    def test_rejects_non_schema_numbers_and_non_finite_values(self) -> None:
+        for value in ("0.8", True, float("nan"), float("inf"), float("-inf")):
+            with self.subTest(value=value):
+                with self.assertRaises(SkillArgumentsError):
+                    self.registry.resolve(
+                        "move_linear",
+                        {"direction": "forward", "distance_m": value},
+                        "往前",
+                    )
+
+    def test_rejects_missing_required_and_invalid_enum(self) -> None:
+        with self.assertRaises(SkillArgumentsError):
+            self.registry.resolve("move_linear", {}, "往前")
+        with self.assertRaises(SkillArgumentsError):
+            self.registry.resolve(
+                "move_linear", {"direction": "sideways"}, "旁邊走"
+            )
+
     def test_rejects_unknown_skill(self) -> None:
         with self.assertRaises(SkillNotFoundError):
             self.registry.resolve("publish_any_topic", {}, "test")

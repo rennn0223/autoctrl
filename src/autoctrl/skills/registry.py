@@ -4,6 +4,7 @@ from collections.abc import Callable, Mapping, Sequence
 from copy import deepcopy
 from dataclasses import dataclass
 from enum import StrEnum
+import math
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -135,12 +136,67 @@ class SkillRegistry:
             raise SkillNotFoundError(f"未知 Skill: {name}")
         if policy is not None and not policy.allows(skill.spec.name, skill.spec.risk):
             raise SkillPermissionError(f"Skill 未被目前策略允許: {name}")
+        _validate_arguments(arguments, skill.spec.input_schema)
         try:
             return skill.resolve(arguments, original_text)
         except SkillError:
             raise
         except (KeyError, TypeError, ValueError) as exc:
             raise SkillArgumentsError(f"Skill 參數無效: {exc}") from exc
+
+
+def _validate_arguments(
+    arguments: Mapping[str, Any],
+    schema: Mapping[str, Any],
+) -> None:
+    required = schema.get("required", ())
+    missing = [name for name in required if name not in arguments]
+    if missing:
+        raise SkillArgumentsError(f"缺少必要參數: {', '.join(missing)}")
+
+    properties = schema.get("properties", {})
+    if schema.get("additionalProperties") is False:
+        unknown = set(arguments) - set(properties)
+        if unknown:
+            raise SkillArgumentsError(
+                f"不支援的參數: {', '.join(sorted(unknown))}"
+            )
+
+    for name, value in arguments.items():
+        property_schema = properties.get(name)
+        if property_schema is None:
+            continue
+        expected = property_schema.get("type")
+        if expected == "number":
+            valid = (
+                isinstance(value, (int, float))
+                and not isinstance(value, bool)
+                and math.isfinite(float(value))
+            )
+        elif expected == "integer":
+            valid = isinstance(value, int) and not isinstance(value, bool)
+        elif expected == "string":
+            valid = isinstance(value, str)
+        elif expected == "boolean":
+            valid = isinstance(value, bool)
+        elif expected == "object":
+            valid = isinstance(value, Mapping)
+        elif expected == "array":
+            valid = isinstance(value, list)
+        else:
+            valid = True
+        if not valid:
+            raise SkillArgumentsError(f"參數 {name} 必須是 {expected}")
+
+        allowed_values = property_schema.get("enum")
+        if allowed_values is not None and value not in allowed_values:
+            raise SkillArgumentsError(f"參數 {name} 不在允許值內")
+        if "exclusiveMinimum" in property_schema and float(value) <= float(
+            property_schema["exclusiveMinimum"]
+        ):
+            raise SkillArgumentsError(
+                f"參數 {name} 必須大於 {property_schema['exclusiveMinimum']}"
+            )
 
 
 _EMPTY_SCHEMA = {
