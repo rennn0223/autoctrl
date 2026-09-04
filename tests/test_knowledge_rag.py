@@ -108,6 +108,8 @@ class KnowledgeAwareFallbackTests(unittest.TestCase):
             ("目前有哪些 ROS topics？", StatusKind.ROS_TOPICS),
             ("What are the current ROS topics?", StatusKind.ROS_TOPICS),
             ("What is the current odometry pose?", StatusKind.ROBOT_POSE),
+            ("What is the current Isaac Sim twin status?", StatusKind.TWIN_STATUS),
+            ("目前 Isaac Sim 虛實同動狀態是什麼？", StatusKind.TWIN_STATUS),
         )
         for text, kind in cases:
             with self.subTest(text=text):

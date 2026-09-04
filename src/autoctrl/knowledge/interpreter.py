@@ -44,7 +44,8 @@ _TEACHING_CUE = re.compile(
 
 _LIVE_STATUS_SUBJECT = re.compile(
     r"\b(?:topics?|odom(?:etry)?|poses?|positions?|locations?|headings?|"
-    r"coordinates?)\b|主題|位置|座標|里程|朝向",
+    r"coordinates?|digital\s*twin|twin\s*status)\b|主題|位置|座標|里程|朝向|"
+    r"虛實同動|虛實差|雙生狀態",
     re.I,
 )
 _LIVE_STATUS_CUE = re.compile(
