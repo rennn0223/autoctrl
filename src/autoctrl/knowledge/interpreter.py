@@ -42,12 +42,36 @@ _TEACHING_CUE = re.compile(
     re.I,
 )
 
+_LIVE_STATUS_SUBJECT = re.compile(
+    r"\b(?:topics?|odom(?:etry)?|poses?|positions?|locations?|headings?|"
+    r"coordinates?)\b|主題|位置|座標|里程|朝向",
+    re.I,
+)
+_LIVE_STATUS_CUE = re.compile(
+    r"目前|現在|當前|此刻|最新|在線|可用|\bcurrent(?:ly)?\b|\bnow\b|"
+    r"\blatest\b|\bavailable\b|\bactive\b|\bonline\b|"
+    r"\bvisible\b|\bdiscoverable\b",
+    re.I,
+)
+_STRONG_TEACHING_CUE = re.compile(
+    r"為什麼|怎麼|如何|差別|差在哪|原理|教我|解釋|\bwhy\b|\bhow\b|"
+    r"\bexplain\b|\bdifference\b|\btutorial\b",
+    re.I,
+)
+
 
 def is_ros2_knowledge_question(text: str) -> bool:
     has_concept = _ROS2_LATIN_CONCEPT.search(text) is not None or any(
         concept in text for concept in _ROS2_CHINESE_CONCEPTS
     )
-    return has_concept and _TEACHING_CUE.search(text) is not None
+    if not has_concept or _TEACHING_CUE.search(text) is None:
+        return False
+    is_live_status = (
+        _LIVE_STATUS_SUBJECT.search(text) is not None
+        and _LIVE_STATUS_CUE.search(text) is not None
+        and _STRONG_TEACHING_CUE.search(text) is None
+    )
+    return not is_live_status
 
 
 class Ros2KnowledgeInterpreter:

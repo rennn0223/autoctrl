@@ -41,6 +41,10 @@ class HybridInterpreter:
         if self.knowledge_path is not None:
             knowledge_reply = self.knowledge_path.interpret(text)
             if knowledge_reply is not None:
+                if not isinstance(knowledge_reply, ConversationReply):
+                    raise TypeError(
+                        "knowledge path must return ConversationReply or None"
+                    )
                 return knowledge_reply
 
         status_query = self.status_path.interpret(text)
