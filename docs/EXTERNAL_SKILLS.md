@@ -64,3 +64,10 @@ AUTOCTRL_EXTERNAL_SKILLS=my_robot autoctrl
 ```
 
 進入 CLI 後輸入 `/skills`，可確認目前實際提供給 LLM 的能力與風險分類。
+
+## 執行與參數驗證
+
+啟動的 `uv sync --inexact` 保留以 `uv pip install` 安裝的可信外掛。
+Skill 參數由 JSON Schema Draft 2020-12 驗證，包含 minimum/maximum、巢狀 object
+及 array items 等限制；schema 必須內嵌，不支援 `$ref`，驗證不會存取網路。
+外掛一般執行例外會轉成可恢復錯誤，CLI 回報後仍能處理下一個命令。

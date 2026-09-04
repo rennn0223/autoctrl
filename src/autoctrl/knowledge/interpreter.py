@@ -16,9 +16,9 @@ class KnowledgeResponder(Protocol):
 
 
 _ROS2_LATIN_CONCEPT = re.compile(
-    r"\b(?:ros\s*2|topics?|services?|actions?|nodes?|qos|tf2?|odom(?:etry)?|"
+    r"(?<![a-z0-9_])(?:ros\s*2|topics?|services?|actions?|nodes?|qos|tf2?|odom(?:etry)?|twist|parameters?|"
     r"cmd_vel|namespaces?|remap(?:ping)?|domain\s*id|ros_domain_id|dds|zenoh|"
-    r"isaac\s*sim|rosbag2?|launch)\b",
+    r"isaac\s*sim|rosbag2?|launch)(?![a-z0-9_])",
     re.I,
 )
 _ROS2_CHINESE_CONCEPTS = (
@@ -32,6 +32,8 @@ _ROS2_CHINESE_CONCEPTS = (
     "命名空間",
     "橋接",
     "通訊",
+    "小車",
+    "機器人",
 )
 _TEACHING_CUE = re.compile(
     r"什麼是|是什麼|為什麼|怎麼|如何|用途|意思|差別|差在哪|不同|"
@@ -91,7 +93,11 @@ class Ros2KnowledgeInterpreter:
             return None
         matches = self._knowledge_base.search(text)
         if not matches:
-            return None
+            return ConversationReply(
+                content="目前的知識庫沒有足夠資料回答這個教學問題，請補充 ROS 2 概念或介面名稱。",
+                source="ros2_rag",
+                original_text=text,
+            )
         answer = self._responder.answer_with_knowledge(
             text, tuple(match.chunk for match in matches)
         )

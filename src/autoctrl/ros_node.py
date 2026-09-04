@@ -27,7 +27,7 @@ from .domain import (
 )
 from .interpreter import HybridInterpreter
 from .knowledge import Ros2KnowledgeInterpreter
-from .motion import MotionConfig, MotionController, Pose2D, Velocity
+from .motion import MotionConfig, MotionController, Pose2D, PoseFeedback, Velocity
 from .ollama import InterpretationError, OllamaInterpreter
 from .sequence import SequentialInterpreter
 from .skills import SkillPolicy, build_skill_registry
@@ -100,6 +100,7 @@ class AutoCtrlNode:  # Constructed dynamically so importing the package does not
                 self.declare_parameter("angular_speed_rps", 0.50)
                 self.declare_parameter("turn_linear_speed_mps", 0.30)
                 self.declare_parameter("control_hz", 20.0)
+                self.declare_parameter("odom_timeout_s", 1.0)
                 self.declare_parameter("model", "qwen3.6:35b")
                 self.declare_parameter("ollama_url", "http://127.0.0.1:11434")
                 self.declare_parameter(
@@ -178,6 +179,9 @@ class AutoCtrlNode:  # Constructed dynamically so importing the package does not
                     self.get_parameter("zenoh_container_name").value
                 )
                 self._pose: Pose2D | None = None
+                self._pose_feedback = PoseFeedback(
+                    float(self.get_parameter("odom_timeout_s").value)
+                )
                 self._simulation_pose: Pose2D | None = None
                 self._twin_monitor = TwinMonitor()
                 self._power_voltage: float | None = None
@@ -253,6 +257,7 @@ class AutoCtrlNode:  # Constructed dynamically so importing the package does not
                 pose = _pose_from_odom(message)
                 with self._lock:
                     self._pose = pose
+                    self._pose_feedback.update(pose)
                     self._twin_monitor.update_real(pose)
 
             def _on_simulation_odom(self, message: Odometry) -> None:
@@ -378,7 +383,7 @@ class AutoCtrlNode:  # Constructed dynamically so importing the package does not
                         self._zero_cycles = 3
                     else:
                         self._twin_monitor.reset()
-                    self._controller.start(intent, self._pose)
+                    self._controller.start(intent, self._pose_feedback.current())
                 self._publish_status("accepted", intent=intent.to_dict())
                 if self._interactive:
                     self._ui.show_intent(intent, self._config)
@@ -387,7 +392,7 @@ class AutoCtrlNode:  # Constructed dynamically so importing the package does not
 
             def _accept_sequence(self, sequence: MotionSequence) -> None:
                 with self._lock:
-                    if self._pose is None and any(
+                    if self._pose_feedback.current() is None and any(
                         action.distance_m is not None or action.angle_deg is not None
                         for action in sequence.actions
                     ):
@@ -396,7 +401,7 @@ class AutoCtrlNode:  # Constructed dynamically so importing the package does not
                     self._twin_monitor.reset()
                     self._pending_motions = deque(sequence.actions)
                     first = self._pending_motions.popleft()
-                    self._controller.start(first, self._pose)
+                    self._controller.start(first, self._pose_feedback.current())
                     self._zero_cycles = 0
                 self._publish_status("accepted_sequence", sequence=sequence.to_dict())
                 if self._interactive:
@@ -425,13 +430,13 @@ class AutoCtrlNode:  # Constructed dynamically so importing the package does not
                     }
 
                 with self._lock:
-                    pose = self._pose
+                    pose = self._pose_feedback.current()
                     voltage = self._power_voltage
                 if query.kind is StatusKind.ROBOT_POSE:
                     if pose is None:
                         return {
                             "available": False,
-                            "reason": f"尚未收到 {self._odom_topic}",
+                            "reason": f"尚未收到新鮮的 {self._odom_topic}，資料可能已逾時",
                         }
                     return {
                         "available": True,
@@ -450,15 +455,36 @@ class AutoCtrlNode:  # Constructed dynamically so importing the package does not
             def _control_tick(self) -> None:
                 next_intent: MotionIntent | None = None
                 with self._lock:
+                    active = self._controller.active_intent
+                    fresh_pose = self._pose_feedback.current()
+                    feedback_lost = (
+                        active is not None
+                        and (active.distance_m is not None or active.angle_deg is not None)
+                        and fresh_pose is None
+                    )
+                    if feedback_lost:
+                        self._pending_motions.clear()
+                        self._controller.stop()
+                        self._zero_cycles = 3
                     was_active = self._controller.active_intent is not None
-                    velocity = self._controller.tick(self._pose)
+                    velocity = self._controller.tick(fresh_pose)
                     is_active = self._controller.active_intent is not None
                     action_completed = was_active and not is_active
                     if action_completed and self._pending_motions:
-                        next_intent = self._pending_motions.popleft()
-                        self._controller.start(next_intent, self._pose)
-                        is_active = self._controller.active_intent is not None
-                        self._zero_cycles = 0
+                        candidate = self._pending_motions[0]
+                        feedback_lost = (
+                            (candidate.distance_m is not None or candidate.angle_deg is not None)
+                            and fresh_pose is None
+                        )
+                        if feedback_lost:
+                            self._pending_motions.clear()
+                            self._zero_cycles = 3
+                            action_completed = False
+                        else:
+                            next_intent = self._pending_motions.popleft()
+                            self._controller.start(next_intent, fresh_pose)
+                            is_active = self._controller.active_intent is not None
+                            self._zero_cycles = 0
                     elif action_completed:
                         self._zero_cycles = max(self._zero_cycles, 3)
                     should_publish = is_active or was_active or self._zero_cycles > 0
@@ -466,6 +492,11 @@ class AutoCtrlNode:  # Constructed dynamically so importing the package does not
                         self._zero_cycles -= 1
                 if should_publish:
                     self._publish_velocity(velocity)
+                if feedback_lost:
+                    reason = "odom 回授逾時或無效，已停止並取消剩餘動作"
+                    self._publish_status("aborted", reason=reason)
+                    if self._interactive:
+                        self._ui.show_error(reason)
                 if action_completed:
                     with self._lock:
                         twin_result = self._twin_monitor.report()

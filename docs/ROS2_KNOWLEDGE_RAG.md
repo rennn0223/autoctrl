@@ -11,11 +11,13 @@ AutoCtrl 內建一個唯讀的 ROS 2 教學回答路徑。它讓展示者可直�
 ## 路由順序
 
 ```text
-使用者輸入
+使用者輸入（先保留完整句意）
+  ├─ 句首明確停止命令 → 立即停止（例如「先停止，再解釋 ROS2」）
+  ├─ 明確 ROS 2 教學問題 → 本地檢索 → 唯讀文字回答
+  ├─ 多步動作 → 逐段驗證；非最後一步必須有距離、角度或時間
   ├─ 既有移動／停止 fast path → MotionIntent
-  ├─ 既有即時狀態 fast path → StatusQuery
-  ├─ 明確 ROS 2 教學問題 → 本地檢索 → Ollama grounded answer
-  └─ 其他內容 → 原有 Ollama tool selection／一般對話
+  ├─ 即時狀態 fast path → StatusQuery
+  └─ 其他內容 → Ollama tool selection／一般對話
 ```
 
 因此「目前有哪些 ROS topics？」仍查詢即時 ROS graph；「topic 是什麼？」才會讀取
@@ -37,3 +39,7 @@ Isaac Sim 官方文件及 Eclipse Zenoh 官方 repository。
 - 知識是隨版本提交的快照，不會自動上網更新；升級 ROS 2、Isaac Sim 或 Zenoh 時應人工複核。
 - 目前不是向量語意搜尋；對非常隱晦、沒有 ROS 2 概念詞的問題可能回到一般對話。
 - 這是教學輔助，不取代官方文件、底盤手冊或安全操作程序。
+
+教學句會在拆分序列及擷取動作詞之前判斷，例如「如何前進然後停止 ROS2 小車？」
+只會回答教學內容。知識不足時明確告知，不退回可呼叫工具的路徑。
+「停」與「stop」仍使用確定性停止路徑。

@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from .domain import CommandRequest, ConversationReply, MotionKind, StatusKind
-from .fast_path import FastPathInterpreter, GuardedFastPathInterpreter
+from .domain import CommandRequest, ConversationReply, MotionIntent, MotionKind, StatusKind
+from .fast_path import FastPathInterpreter, GuardedFastPathInterpreter, is_explicit_stop_prefix
 from .ollama import OllamaInterpreter
 from .status import GuardedStatusFastPathInterpreter, StatusFastPathInterpreter
 
@@ -26,6 +26,18 @@ class HybridInterpreter:
         self.knowledge_path = knowledge_path
 
     def interpret(self, text: str) -> CommandRequest:
+        if is_explicit_stop_prefix(text):
+            return MotionIntent.stop(source="guarded_fast_path", original_text=text)
+        # Resolve complete teaching questions before extracting motion words.
+        if self.knowledge_path is not None:
+            knowledge_reply = self.knowledge_path.interpret(text)
+            if knowledge_reply is not None:
+                if not isinstance(knowledge_reply, ConversationReply):
+                    raise ValueError(
+                        "knowledge path must return ConversationReply or None"
+                    )
+                return knowledge_reply
+
         motion_intent = self.fast_path.interpret(text)
 
         # Explicit stop remains highest priority. "停在哪裡" is the common
@@ -37,15 +49,6 @@ class HybridInterpreter:
             and "停在哪" not in normalized
         ):
             return motion_intent
-
-        if self.knowledge_path is not None:
-            knowledge_reply = self.knowledge_path.interpret(text)
-            if knowledge_reply is not None:
-                if not isinstance(knowledge_reply, ConversationReply):
-                    raise ValueError(
-                        "knowledge path must return ConversationReply or None"
-                    )
-                return knowledge_reply
 
         status_query = self.status_path.interpret(text)
         if status_query is not None:

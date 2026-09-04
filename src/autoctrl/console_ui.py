@@ -457,14 +457,14 @@ class ConsoleUI:
                 padding=(0, 1),
             )
 
-        final = Text()
+        final = Text(no_wrap=False, overflow="fold")
         for value, style in segments:
             final.append(value, style=style)
         if self._typing_delay_s <= 0:
-            self.console.print(panel(final))
+            self.console.print(panel(final), soft_wrap=False)
             return
 
-        typed = Text()
+        typed = Text(no_wrap=False, overflow="fold")
         characters = [
             (character, style)
             for value, style in segments
@@ -474,7 +474,7 @@ class ConsoleUI:
             panel(typed),
             console=self.console,
             refresh_per_second=30,
-            transient=False,
+            transient=True,
         ) as live:
             for index in range(0, len(characters), 2):
                 for character, style in characters[index : index + 2]:
@@ -482,6 +482,7 @@ class ConsoleUI:
                 live.update(panel(typed))
                 time.sleep(self._typing_delay_s)
             live.update(panel(final), refresh=True)
+        self.console.print(panel(final), soft_wrap=False)
 
     def _start_activity(self, message: str) -> None:
         with self._lock:

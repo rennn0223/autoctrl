@@ -8,6 +8,9 @@ import math
 import re
 from typing import TYPE_CHECKING, Any
 
+from jsonschema import Draft202012Validator
+from jsonschema.exceptions import SchemaError, ValidationError
+
 if TYPE_CHECKING:
     from .policy import SkillPolicy
 
@@ -76,6 +79,11 @@ class SkillSpec:
             raise ValueError(f"Skill schema properties 格式錯誤: {self.name}")
         if self.input_schema.get("additionalProperties") is not False:
             raise ValueError(f"Skill schema 必須關閉 additionalProperties: {self.name}")
+        try:
+            Draft202012Validator.check_schema(dict(self.input_schema))
+        except SchemaError as exc:
+            raise ValueError(f"Skill schema 無效: {self.name}: {exc.message}") from exc
+        _reject_schema_references(self.input_schema)
         required = self.input_schema.get("required", ())
         if not isinstance(required, (list, tuple)) or any(
             not isinstance(item, str) or item not in properties for item in required
@@ -196,8 +204,8 @@ class SkillRegistry:
             request = skill.resolve(arguments, original_text)
         except SkillError:
             raise
-        except (KeyError, TypeError, ValueError) as exc:
-            raise SkillArgumentsError(f"Skill 參數無效: {exc}") from exc
+        except Exception as exc:
+            raise SkillResultError(f"Skill {name} 執行失敗: {exc}") from exc
         if not isinstance(
             request,
             (MotionIntent, MotionSequence, StatusQuery, ConversationReply),
@@ -206,60 +214,40 @@ class SkillRegistry:
         return request
 
 
-def _validate_arguments(
-    arguments: Mapping[str, Any],
-    schema: Mapping[str, Any],
-) -> None:
-    required = schema.get("required", ())
-    missing = [name for name in required if name not in arguments]
-    if missing:
-        raise SkillArgumentsError(f"缺少必要參數: {', '.join(missing)}")
+def _reject_schema_references(value: Any) -> None:
+    # Skill schemas are self-contained; validation must never fetch remote data.
+    if isinstance(value, Mapping):
+        if "$ref" in value or "$dynamicRef" in value:
+            raise ValueError("Skill schema 必須內嵌定義，不支援 $ref")
+        for child in value.values():
+            _reject_schema_references(child)
+    elif isinstance(value, (list, tuple)):
+        for child in value:
+            _reject_schema_references(child)
 
-    properties = schema.get("properties", {})
-    if schema.get("additionalProperties") is False:
-        unknown = set(arguments) - set(properties)
-        if unknown:
-            raise SkillArgumentsError(
-                f"不支援的參數: {', '.join(sorted(unknown))}"
-            )
 
-    for name, value in arguments.items():
-        property_schema = properties.get(name)
-        if property_schema is None:
-            continue
-        expected = property_schema.get("type")
-        if expected == "number":
-            valid = isinstance(value, (int, float)) and not isinstance(value, bool)
-            if valid:
-                try:
-                    valid = math.isfinite(value)
-                except OverflowError:
-                    valid = False
-        elif expected == "integer":
-            valid = isinstance(value, int) and not isinstance(value, bool)
-        elif expected == "string":
-            valid = isinstance(value, str)
-        elif expected == "boolean":
-            valid = isinstance(value, bool)
-        elif expected == "object":
-            valid = isinstance(value, Mapping)
-        elif expected == "array":
-            valid = isinstance(value, list)
-        else:
-            valid = True
-        if not valid:
-            raise SkillArgumentsError(f"參數 {name} 必須是 {expected}")
+def _validate_arguments(arguments: Mapping[str, Any], schema: Mapping[str, Any]) -> None:
+    def check_finite(value: Any) -> None:
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            try:
+                finite = math.isfinite(value)
+            except OverflowError:
+                finite = False
+            if not finite:
+                raise SkillArgumentsError("數值必須是有限數字")
+        elif isinstance(value, Mapping):
+            for child in value.values():
+                check_finite(child)
+        elif isinstance(value, (list, tuple)):
+            for child in value:
+                check_finite(child)
 
-        allowed_values = property_schema.get("enum")
-        if allowed_values is not None and value not in allowed_values:
-            raise SkillArgumentsError(f"參數 {name} 不在允許值內")
-        if (
-            "exclusiveMinimum" in property_schema
-            and value <= property_schema["exclusiveMinimum"]
-        ):
-            raise SkillArgumentsError(
-                f"參數 {name} 必須大於 {property_schema['exclusiveMinimum']}"
-            )
+    check_finite(arguments)
+    try:
+        Draft202012Validator(dict(schema)).validate(dict(arguments))
+    except ValidationError as exc:
+        path = ".".join(str(part) for part in exc.path) or "arguments"
+        raise SkillArgumentsError(f"參數 {path} 無效: {exc.message}") from exc
 
 
 _EMPTY_SCHEMA = {

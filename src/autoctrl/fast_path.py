@@ -24,6 +24,16 @@ _CHINESE_DURATION = re.compile(
 )
 
 
+def is_explicit_stop_prefix(text: str) -> bool:
+    """An imperative stop before another clause takes precedence over teaching."""
+    return re.match(
+        r"^(?:(?:請先|請|先)\s*)?(?:停止|停下|停車|停|煞車|急停)"
+        r"(?=$|[\s!！,，。；;]|再|然後)"
+        r"|^(?:please\s+)?stop(?=$|[\s!.,;])",
+        text.strip(), re.I,
+    ) is not None
+
+
 def _contains_any(text: str, words: tuple[str, ...]) -> bool:
     return any(word in text for word in words)
 

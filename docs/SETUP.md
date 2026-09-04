@@ -356,3 +356,10 @@ ros2 topic list | grep '^/small/'
 ```
 
 並確認小車端的 Zenoh bridge 與 WHEELTEC 底盤 driver 仍在執行。
+
+## 回授逾時
+
+指定距離／角度的動作需要新鮮 odom；`odom_timeout_s` 預設 1.0 秒（可透過 ROS
+parameter 調整為正值）。回授過期或非有限數值時發布零速度、取消整個剩餘序列，
+回報 `aborted`，不回報動作完成。未指定距離／角度的持續或定時動作保留原行為。
+指定轉角以要求方向的淨旋轉量判定，反轉不會累積成成功。
