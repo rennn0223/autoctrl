@@ -7,7 +7,7 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from .domain import CommandRequest, ConversationReply
-from .skills import SkillError, SkillPolicy, SkillRegistry, SkillRisk
+from .skills import SkillError, SkillPolicy, SkillRegistry, SkillRisk, SkillSpec
 
 
 class InterpretationError(RuntimeError):
@@ -104,6 +104,10 @@ class OllamaInterpreter:
             )
         except SkillError as exc:
             raise InterpretationError(str(exc)) from exc
+
+    @property
+    def skill_specs(self) -> tuple[SkillSpec, ...]:
+        return self._skills.enabled_specs(self._skill_policy)
 
     def warmup(self) -> None:
         self._transport(

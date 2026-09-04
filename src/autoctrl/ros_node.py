@@ -29,7 +29,7 @@ from .interpreter import HybridInterpreter
 from .motion import MotionConfig, MotionController, Pose2D, Velocity
 from .ollama import InterpretationError, OllamaInterpreter
 from .sequence import SequentialInterpreter
-from .skills import SkillPolicy
+from .skills import SkillPolicy, build_skill_registry
 from .twin import TwinMonitor
 
 
@@ -105,6 +105,10 @@ class AutoCtrlNode:  # Constructed dynamically so importing the package does not
                     "llm_enabled_skills",
                     os.environ.get("AUTOCTRL_LLM_SKILLS", "*"),
                 )
+                self.declare_parameter(
+                    "external_skill_providers",
+                    os.environ.get("AUTOCTRL_EXTERNAL_SKILLS", ""),
+                )
                 self.declare_parameter("doctor_startup_delay_s", 0.0)
                 self.declare_parameter("doctor_timeout_s", 2.0)
                 self.declare_parameter("zenoh_container_name", "zenoh-bridge")
@@ -132,9 +136,13 @@ class AutoCtrlNode:  # Constructed dynamically so importing the package does not
                     angular_speed_rps=float(self.get_parameter("angular_speed_rps").value),
                     turn_linear_speed_mps=float(self.get_parameter("turn_linear_speed_mps").value),
                 )
+                skills = build_skill_registry(
+                    str(self.get_parameter("external_skill_providers").value)
+                )
                 ollama = OllamaInterpreter(
                     model=model,
                     base_url=str(self.get_parameter("ollama_url").value),
+                    skills=skills,
                     skill_policy=SkillPolicy.from_csv(
                         str(self.get_parameter("llm_enabled_skills").value)
                     ),
@@ -143,6 +151,7 @@ class AutoCtrlNode:  # Constructed dynamically so importing the package does not
                     HybridInterpreter(ollama=ollama)
                 )
                 self._ollama = ollama
+                self._skill_specs = ollama.skill_specs
                 self._config = config
                 self._interactive = bool(self.get_parameter("interactive").value)
                 self._ui = (
@@ -299,6 +308,21 @@ class AutoCtrlNode:  # Constructed dynamically so importing the package does not
                             self._publish_status("twin", result=result)
                             if self._interactive:
                                 self._ui.show_twin_status(result)
+                            continue
+                        if text.lower() == "/skills":
+                            result = [
+                                {
+                                    "name": spec.name,
+                                    "description": spec.description,
+                                    "risk": spec.risk.value,
+                                }
+                                for spec in self._skill_specs
+                            ]
+                            self._publish_status("skills", result=result)
+                            if self._interactive:
+                                self._ui.show_skills(self._skill_specs)
+                            else:
+                                self.get_logger().info(f"Skills: {result}")
                             continue
                         self._publish_status("parsing", text=text)
                         if self._interactive:

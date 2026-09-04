@@ -1,0 +1,65 @@
+# 外部 Skill 擴充
+
+AutoCtrl 可從獨立 Python 套件載入 Skill。外掛只負責把 LLM 的結構化參數轉成
+既有 `CommandRequest`；ROS 2 topic 發布與動作執行仍由 AutoCtrl 控制器處理。
+
+## 信任與啟用規則
+
+- 安裝套件不等於啟用，預設不會載入任何外掛。
+- 只有列在 `AUTOCTRL_EXTERNAL_SKILLS` 的 entry-point provider 才會 import。
+- 外掛與 AutoCtrl 在同一 Python 程序執行，必須視為可信任程式碼；不要安裝來源不明的套件。
+- 外掛 Skill 名稱不能覆蓋內建 Skill。
+- 若同時設定 `AUTOCTRL_LLM_SKILLS`，外掛的 Skill 名稱也必須在該清單內。
+
+## 套件介面
+
+外掛套件的 `pyproject.toml` 宣告 `autoctrl.skills` entry-point group：
+
+```toml
+[project.entry-points."autoctrl.skills"]
+my_robot = "my_autoctrl_skills:provide_skills"
+```
+
+Provider 回傳一組 `SkillDefinition`。Resolver 應為純轉換函式，不可直接建立 ROS node
+或發布 topic。以下示例新增「低速前進」語意：
+
+```python
+from autoctrl.domain import LinearDirection, MotionIntent, MotionKind
+from autoctrl.skills import SkillDefinition, SkillRisk, SkillSpec
+
+
+def provide_skills():
+    return (
+        SkillDefinition(
+            spec=SkillSpec(
+                name="move_slowly",
+                description="讓小車以低速向前移動；未指定秒數時持續移動。",
+                risk=SkillRisk.MOTION,
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "duration_s": {"type": "number", "exclusiveMinimum": 0}
+                    },
+                    "additionalProperties": False,
+                },
+            ),
+            resolve=lambda args, text: MotionIntent(
+                kind=MotionKind.MOVE_LINEAR,
+                linear_direction=LinearDirection.FORWARD,
+                duration_s=args.get("duration_s"),
+                speed_mps=0.1,
+                source="external_skill",
+                original_text=text,
+            ),
+        ),
+    )
+```
+
+在 AutoCtrl 的 uv 環境安裝可信任套件後，以 provider 名稱明確啟用：
+
+```bash
+uv pip install /path/to/my-autoctrl-skills
+AUTOCTRL_EXTERNAL_SKILLS=my_robot autoctrl
+```
+
+進入 CLI 後輸入 `/skills`，可確認目前實際提供給 LLM 的能力與風險分類。

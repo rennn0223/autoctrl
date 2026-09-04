@@ -117,12 +117,20 @@ class SkillRegistry:
                 f"允許清單包含未知 Skill: {', '.join(sorted(unknown))}"
             )
 
+    def enabled_specs(
+        self, policy: SkillPolicy | None = None
+    ) -> tuple[SkillSpec, ...]:
+        return tuple(
+            spec
+            for spec in self.specs
+            if policy is None or policy.allows(spec.name, spec.risk)
+        )
+
     def ollama_tools(self, policy: SkillPolicy | None = None) -> list[dict[str, Any]]:
-        return [
-            skill.spec.as_ollama_tool()
-            for skill in self._skills.values()
-            if policy is None or policy.allows(skill.spec.name, skill.spec.risk)
-        ]
+        return [spec.as_ollama_tool() for spec in self.enabled_specs(policy)]
+
+    def extended(self, skills: Sequence[SkillDefinition]) -> SkillRegistry:
+        return SkillRegistry((*self._skills.values(), *skills))
 
     def resolve(
         self,
