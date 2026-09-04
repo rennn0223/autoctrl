@@ -6,6 +6,7 @@ import os
 from .console_ui import ConsoleUI, EXIT_SLASH_COMMANDS
 from .domain import ConversationReply, StatusQuery
 from .interpreter import HybridInterpreter
+from .knowledge import KnowledgeAwareFallback
 from .motion import MotionConfig
 from .ollama import InterpretationError, OllamaInterpreter
 from .skills import (
@@ -53,7 +54,7 @@ def main() -> None:
         ui.show_ready(args.model)
         return
 
-    interpreter = HybridInterpreter(ollama=ollama)
+    interpreter = HybridInterpreter(ollama=KnowledgeAwareFallback(ollama))
     config = MotionConfig()
     if args.command:
         _show_intent(ui, interpreter, config, " ".join(args.command))

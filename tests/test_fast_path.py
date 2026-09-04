@@ -74,6 +74,10 @@ class FastPathTests(unittest.TestCase):
         self.assertEqual(intent.kind, MotionKind.STOP)
         self.assertEqual(self.parser.interpret("停").kind, MotionKind.STOP)
 
+    def test_ros_topics_is_not_a_stop_command(self) -> None:
+        self.assertIsNone(self.parser.interpret("目前有哪些 ROS topics？"))
+        self.assertEqual(self.parser.interpret("目前停止").kind, MotionKind.STOP)
+
     def test_conflicting_directions_fall_through(self) -> None:
         self.assertIsNone(self.parser.interpret("前進再後退"))
 

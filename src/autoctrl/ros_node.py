@@ -26,6 +26,7 @@ from .domain import (
     StatusQuery,
 )
 from .interpreter import HybridInterpreter
+from .knowledge import KnowledgeAwareFallback
 from .motion import MotionConfig, MotionController, Pose2D, Velocity
 from .ollama import InterpretationError, OllamaInterpreter
 from .sequence import SequentialInterpreter
@@ -148,7 +149,7 @@ class AutoCtrlNode:  # Constructed dynamically so importing the package does not
                     ),
                 )
                 self._interpreter = SequentialInterpreter(
-                    HybridInterpreter(ollama=ollama)
+                    HybridInterpreter(ollama=KnowledgeAwareFallback(ollama))
                 )
                 self._ollama = ollama
                 self._skill_specs = ollama.skill_specs

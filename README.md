@@ -9,7 +9,8 @@ AutoCtrl 在 NVIDIA DGX Spark 上執行，透過 ROS2 與 Zenoh bridge 控制 WH
 ## 產品特色
 
 - 聽懂繁體中文與常用英文的前進、後退、左轉、右轉與停止命令
-- 以自然語言唯讀查詢 ROS topics、odom 目前位置與電池電壓
+- 以自然語言唯讀查詢 ROS topics、odom 目前位置、電池電壓與虛實同動誤差
+- 內建具官方來源的 ROS 2 教學 RAG，可解釋 QoS、tf2、Domain ID、Zenoh 與 Isaac Sim bridge
 - 常見命令使用確定性快速路徑，其他自然語言交由本地 `qwen3.6:35b` 判讀
 - 未指定距離或角度時持續移動，直到收到停止命令
 - 支援阿克曼轉向、指定距離與指定角度
@@ -19,6 +20,7 @@ AutoCtrl 在 NVIDIA DGX Spark 上執行，透過 ROS2 與 Zenoh bridge 控制 WH
 - 支援 `/exit` 發布零速度並安全離開 CLI
 - 單按 `Ctrl-C` 發布零速度並安全退出
 - 機器人 namespace 預設為 `/small`，可透過 ROS2 parameters 配合其他部署調整
+- 以 Skill Registry、允許策略與外部 provider 擴充能力，並可用 `/skills` 檢視
 - 透過 ROS2 topic 與 parameters 保留後續整合能力
 
 ## 系統角色
@@ -42,6 +44,8 @@ LLM 只負責理解命令並產生結構化移動意圖或唯讀狀態查詢；�
 部署需求、環境設定、小車端準備、一鍵啟動、ROS2 topics、參數調整與測試方式請參閱：
 
 **[Automation 2026 設定與操作手冊](docs/SETUP.md)**
+
+ROS 2 教學問答的範圍、來源與安全邊界見 **[ROS 2 知識 RAG](docs/ROS2_KNOWLEDGE_RAG.md)**；外部能力套件見 **[外部 Skill 擴充](docs/EXTERNAL_SKILLS.md)**。
 
 同一個 `autoctrl` 指令會預先建立 Isaac Sim 虛實通道，將命令同步送往實車與 `/sim` 虛擬車，並以 `/twin` 顯示相對位移與朝向誤差。設定方式請參閱 **[虛實同動模式](docs/DIGITAL_TWIN.md)**。
 

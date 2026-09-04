@@ -213,7 +213,7 @@ class ConsoleUI:
                 )
             )
         )
-        self.console.print("  [dim]輸入自然語言控制小車，或查詢 ROS topics、目前位置、電池電壓與虛實同動。[/dim]")
+        self.console.print("  [dim]輸入自然語言控制小車、查詢車況，或詢問 ROS 2 概念。[/dim]")
         hints = [
             f"[dim]{command.name}[/dim] [grey50]{command.description}[/grey50]"
             for command in self._slash_commands

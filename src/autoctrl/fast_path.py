@@ -6,7 +6,8 @@ from dataclasses import replace
 from .domain import LinearDirection, MotionIntent, MotionKind, TurnDirection
 
 
-_STOP_WORDS = ("停", "停止", "停下", "停車", "不要動", "別動", "煞車", "急停", "stop")
+_STOP_WORDS = ("停", "停止", "停下", "停車", "不要動", "別動", "煞車", "急停")
+_STOP_ENGLISH = re.compile(r"\bstop\b", re.I)
 _FORWARD_WORDS = ("往前", "向前", "前進", "朝前", "forward")
 _BACKWARD_WORDS = ("往後", "向後", "後退", "倒退", "倒車", "backward")
 _LEFT_WORDS = ("左轉", "往左轉", "向左轉", "轉左", "左邊", "left")
@@ -25,6 +26,11 @@ _CHINESE_DURATION = re.compile(
 
 def _contains_any(text: str, words: tuple[str, ...]) -> bool:
     return any(word in text for word in words)
+
+
+def _contains_stop(text: str) -> bool:
+    # 英文 stop 必須是完整單字，避免 ROS topics 合併後的 rostopics 誤觸發。
+    return _contains_any(text, _STOP_WORDS) or _STOP_ENGLISH.search(text) is not None
 
 
 def _chinese_integer(text: str) -> int:
@@ -89,7 +95,7 @@ class FastPathInterpreter:
         if not normalized:
             return None
 
-        if _contains_any(normalized, _STOP_WORDS):
+        if _contains_stop(text.strip().lower()):
             return MotionIntent.stop(source="fast_path", original_text=text)
 
         matches = {
