@@ -95,5 +95,5 @@ class Ros2KnowledgeInterpreter:
             text, tuple(match.chunk for match in matches)
         )
         if not isinstance(answer, ConversationReply):
-            raise TypeError("ROS 2 knowledge responder must return ConversationReply")
+            raise ValueError("ROS 2 knowledge responder must return ConversationReply")
         return answer

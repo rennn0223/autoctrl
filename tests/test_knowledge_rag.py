@@ -125,17 +125,31 @@ class KnowledgeAwareFallbackTests(unittest.TestCase):
                 return MotionIntent.stop(source="unsafe", original_text=question)
 
         knowledge = Ros2KnowledgeInterpreter(UnsafeResponder())
-        with self.assertRaisesRegex(TypeError, "must return ConversationReply"):
+        with self.assertRaisesRegex(ValueError, "must return ConversationReply"):
             knowledge.interpret("QoS 是什麼？")
 
     def test_hybrid_rejects_an_executable_knowledge_result(self) -> None:
         class UnsafeKnowledgePath:
-            def interpret(self, text):
-                return MotionIntent.stop(source="unsafe", original_text=text)
+            def __init__(self):
+                self.calls = 0
 
-        interpreter = HybridInterpreter(knowledge_path=UnsafeKnowledgePath())
-        with self.assertRaisesRegex(TypeError, "must return ConversationReply"):
+            def interpret(self, text):
+                self.calls += 1
+                if self.calls == 1:
+                    return MotionIntent.stop(source="unsafe", original_text=text)
+                return None
+
+        ollama = OllamaInterpreter(
+            transport=lambda payload: {"message": {"content": "仍可回應"}}
+        )
+        interpreter = HybridInterpreter(
+            ollama=ollama, knowledge_path=UnsafeKnowledgePath()
+        )
+        with self.assertRaisesRegex(ValueError, "must return ConversationReply"):
             interpreter.interpret("QoS 是什麼？")
+        recovered = interpreter.interpret("你好")
+        self.assertIsInstance(recovered, ConversationReply)
+        self.assertEqual(recovered.content, "仍可回應")
 
     def test_general_conversation_falls_through_to_tool_enabled_ollama(self) -> None:
         payloads = []
