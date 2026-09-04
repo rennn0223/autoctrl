@@ -73,7 +73,15 @@ class SkillRegistryTests(unittest.TestCase):
         self.assertEqual(request.kind, StatusKind.TWIN_STATUS)
 
     def test_rejects_non_schema_numbers_and_non_finite_values(self) -> None:
-        for value in ("0.8", True, float("nan"), float("inf"), float("-inf")):
+        for value in (
+            "0.8",
+            True,
+            float("nan"),
+            float("inf"),
+            float("-inf"),
+            10**400,
+            -(10**400),
+        ):
             with self.subTest(value=value):
                 with self.assertRaises(SkillArgumentsError):
                     self.registry.resolve(

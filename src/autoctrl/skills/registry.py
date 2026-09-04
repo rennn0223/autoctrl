@@ -168,11 +168,12 @@ def _validate_arguments(
             continue
         expected = property_schema.get("type")
         if expected == "number":
-            valid = (
-                isinstance(value, (int, float))
-                and not isinstance(value, bool)
-                and math.isfinite(float(value))
-            )
+            valid = isinstance(value, (int, float)) and not isinstance(value, bool)
+            if valid:
+                try:
+                    valid = math.isfinite(value)
+                except OverflowError:
+                    valid = False
         elif expected == "integer":
             valid = isinstance(value, int) and not isinstance(value, bool)
         elif expected == "string":
@@ -191,8 +192,9 @@ def _validate_arguments(
         allowed_values = property_schema.get("enum")
         if allowed_values is not None and value not in allowed_values:
             raise SkillArgumentsError(f"參數 {name} 不在允許值內")
-        if "exclusiveMinimum" in property_schema and float(value) <= float(
-            property_schema["exclusiveMinimum"]
+        if (
+            "exclusiveMinimum" in property_schema
+            and value <= property_schema["exclusiveMinimum"]
         ):
             raise SkillArgumentsError(
                 f"參數 {name} 必須大於 {property_schema['exclusiveMinimum']}"
