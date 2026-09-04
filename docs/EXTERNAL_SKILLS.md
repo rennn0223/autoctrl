@@ -1,13 +1,14 @@
 # 外部 Skill 擴充
 
-AutoCtrl 可從獨立 Python 套件載入 Skill。外掛只負責把 LLM 的結構化參數轉成
-既有 `CommandRequest`；ROS 2 topic 發布與動作執行仍由 AutoCtrl 控制器處理。
+AutoCtrl 可從獨立 Python 套件載入 Skill。外掛介面的用途是把 LLM 的結構化參數
+轉成既有 `CommandRequest`；正常的 ROS 2 topic 發布與動作執行仍由 AutoCtrl 控制器處理。
 
 ## 信任與啟用規則
 
 - 安裝套件不等於啟用，預設不會載入任何外掛。
 - 只有列在 `AUTOCTRL_EXTERNAL_SKILLS` 的 entry-point provider 才會 import。
-- 外掛與 AutoCtrl 在同一 Python 程序執行，必須視為可信任程式碼；不要安裝來源不明的套件。
+- 外掛與 AutoCtrl 在同一 Python 程序執行；允許 provider 等同授予完整的程序內 Python 程式碼執行權限。
+- Allowlist 是明確授權機制，不是安全沙箱；不要安裝或允許來源不明的套件。
 - 外掛 Skill 名稱不能覆蓋內建 Skill。
 - 若同時設定 `AUTOCTRL_LLM_SKILLS`，外掛的 Skill 名稱也必須在該清單內。
 
@@ -21,7 +22,7 @@ my_robot = "my_autoctrl_skills:provide_skills"
 ```
 
 Provider 回傳一組 `SkillDefinition`。Resolver 應為純轉換函式，不可直接建立 ROS node
-或發布 topic。以下示例新增「低速前進」語意：
+或發布 topic；這是 provider 契約，並非程序隔離的技術保證。以下示例新增「低速前進」語意：
 
 ```python
 from autoctrl.domain import LinearDirection, MotionIntent, MotionKind

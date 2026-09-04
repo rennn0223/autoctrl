@@ -5,11 +5,11 @@
 ## 不可破壞的行為
 
 - 確定性移動 fast path、文字停止優先權及既有狀態 fast path 保持原順序。
-- LLM 只能選擇 Registry 公開的 Skill，不能指定任意 ROS topic 或自行產生底盤速度。
+- LLM 只能選擇 Registry 公開的 Skill，不能透過工具參數指定任意 ROS topic 或自行產生底盤速度。
 - 所有移動仍轉成既有 `MotionIntent` / `MotionSequence`，由既有 ROS 2 控制器執行。
 - `stop_vehicle` 必須持續可用，且不被一般能力開關移除。
 - ROS 2 知識 RAG 只能產生文字回答，不得發布速度或觸發其他 Skill。
-- 外部 Skill 必須由使用者明確允許；未允許的已安裝套件不載入。
+- 外部 Skill 必須由使用者明確允許；未允許的已安裝套件不載入。允許同程序 provider 等同授予其 Python 程式碼執行權限，allowlist 不構成沙箱。
 - 每一層均須通過既有測試；完整堆疊還須回歸 320 句語料與 Isaac Sim 整合測試。
 
 ## PR 1：Skill Registry 核心

@@ -34,7 +34,18 @@ def load_external_skills(
         if available_entry_points is not None
         else tuple(metadata.entry_points(group=EXTERNAL_SKILL_GROUP))
     )
-    by_name = {entry_point.name: entry_point for entry_point in entry_points}
+    matches = {
+        name: tuple(
+            entry_point for entry_point in entry_points if entry_point.name == name
+        )
+        for name in requested
+    }
+    conflicts = [name for name, found in matches.items() if len(found) > 1]
+    if conflicts:
+        raise ExternalSkillError(
+            f"外部 Skill provider 名稱衝突: {', '.join(conflicts)}"
+        )
+    by_name = {name: found[0] for name, found in matches.items() if found}
     missing = [name for name in requested if name not in by_name]
     if missing:
         raise ExternalSkillError(

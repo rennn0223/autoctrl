@@ -5,6 +5,7 @@ from autoctrl.skills import (
     ExternalSkillError,
     SkillDefinition,
     SkillRegistry,
+    SkillResultError,
     SkillRisk,
     SkillSpec,
     load_external_skills,
@@ -66,6 +67,55 @@ class ExternalSkillTests(unittest.TestCase):
         )
         self.assertFalse(entry_point.loaded)
 
+    def test_duplicate_provider_name_fails_without_loading_either(self) -> None:
+        first = FakeEntryPoint("duplicate", lambda: (demo_skill(),))
+        second = FakeEntryPoint("duplicate", lambda: (demo_skill(),))
+        with self.assertRaisesRegex(ExternalSkillError, "名稱衝突"):
+            load_external_skills(
+                "duplicate", available_entry_points=(first, second)
+            )
+        self.assertFalse(first.loaded)
+        self.assertFalse(second.loaded)
+
+    def test_malformed_skill_is_reported_at_provider_boundary(self) -> None:
+        malformed_providers = (
+            lambda: (
+                SkillDefinition(
+                    spec=SkillSpec(
+                        name="bad",
+                        description="bad schema",
+                        risk=SkillRisk.READ_ONLY,
+                        input_schema={"type": "array", "properties": {}},
+                    ),
+                    resolve=lambda _arguments, _text: None,
+                ),
+            ),
+            lambda: (
+                SkillDefinition(
+                    spec=SkillSpec(
+                        name="bad",
+                        description="bad resolver",
+                        risk=SkillRisk.READ_ONLY,
+                        input_schema={
+                            "type": "object",
+                            "properties": {},
+                            "additionalProperties": False,
+                        },
+                    ),
+                    resolve=None,
+                ),
+            ),
+        )
+        for provider in malformed_providers:
+            with self.subTest(provider=provider):
+                entry_point = FakeEntryPoint("malformed", provider)
+                with self.assertRaisesRegex(
+                    ExternalSkillError, "malformed"
+                ):
+                    load_external_skills(
+                        "malformed", available_entry_points=(entry_point,)
+                    )
+
     def test_missing_provider_fails_closed(self) -> None:
         with self.assertRaisesRegex(ExternalSkillError, "missing"):
             load_external_skills("missing", available_entry_points=())
@@ -74,6 +124,24 @@ class ExternalSkillTests(unittest.TestCase):
         entry_point = FakeEntryPoint("invalid", lambda: ("not-a-skill",))
         with self.assertRaisesRegex(ExternalSkillError, "回傳格式錯誤"):
             load_external_skills("invalid", available_entry_points=(entry_point,))
+
+    def test_invalid_resolver_result_is_rejected_before_dispatch(self) -> None:
+        definition = SkillDefinition(
+            spec=SkillSpec(
+                name="broken_result",
+                description="returns an invalid result",
+                risk=SkillRisk.READ_ONLY,
+                input_schema={
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": False,
+                },
+            ),
+            resolve=lambda _arguments, _text: None,
+        )
+        registry = SkillRegistry.builtins().extended((definition,))
+        with self.assertRaisesRegex(SkillResultError, "broken_result"):
+            registry.resolve("broken_result", {}, "test")
 
     def test_external_skill_cannot_replace_builtin(self) -> None:
         registry = SkillRegistry.builtins()

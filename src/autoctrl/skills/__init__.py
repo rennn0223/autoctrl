@@ -12,6 +12,7 @@ from .registry import (
     SkillNotFoundError,
     SkillPermissionError,
     SkillRegistry,
+    SkillResultError,
     SkillRisk,
     SkillSpec,
 )
@@ -30,6 +31,7 @@ __all__ = [
     "SkillNotFoundError",
     "SkillPermissionError",
     "SkillRegistry",
+    "SkillResultError",
     "SkillRisk",
     "SkillSpec",
 ]
