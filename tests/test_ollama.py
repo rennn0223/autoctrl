@@ -2,6 +2,7 @@ import unittest
 
 from autoctrl.domain import LinearDirection, MotionKind, StatusKind
 from autoctrl.ollama import InterpretationError, OllamaInterpreter
+from autoctrl.skills import SkillDefinition, SkillRegistry, SkillRisk, SkillSpec
 
 
 class OllamaInterpreterTests(unittest.TestCase):
@@ -14,6 +15,23 @@ class OllamaInterpreterTests(unittest.TestCase):
 
         OllamaInterpreter(transport=transport).interpret("你好")
         self.assertEqual(captured["options"], {"temperature": 0.0, "seed": 42})
+
+    def test_rejects_registry_without_critical_stop_skill(self) -> None:
+        registry = SkillRegistry(
+            (
+                SkillDefinition(
+                    spec=SkillSpec(
+                        name="read_only_demo",
+                        description="demo",
+                        risk=SkillRisk.READ_ONLY,
+                        input_schema={"type": "object", "properties": {}},
+                    ),
+                    resolve=lambda _arguments, _text: None,  # type: ignore[return-value]
+                ),
+            )
+        )
+        with self.assertRaisesRegex(ValueError, "stop_vehicle"):
+            OllamaInterpreter(transport=lambda _: {}, skills=registry)
 
     def test_maps_tool_call_to_intent(self) -> None:
         def transport(_payload):

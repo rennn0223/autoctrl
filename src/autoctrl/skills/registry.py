@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
+from copy import deepcopy
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any
@@ -47,7 +48,7 @@ class SkillSpec:
             "function": {
                 "name": self.name,
                 "description": self.description,
-                "parameters": dict(self.input_schema),
+                "parameters": deepcopy(dict(self.input_schema)),
             },
         }
 
@@ -65,8 +66,20 @@ class SkillRegistry:
     """Owns the complete LLM-visible skill catalogue and argument conversion."""
 
     def __init__(self, skills: Sequence[SkillDefinition]) -> None:
-        by_name = {skill.spec.name: skill for skill in skills}
-        if len(by_name) != len(skills):
+        isolated = tuple(
+            SkillDefinition(
+                spec=SkillSpec(
+                    name=skill.spec.name,
+                    description=skill.spec.description,
+                    risk=skill.spec.risk,
+                    input_schema=deepcopy(dict(skill.spec.input_schema)),
+                ),
+                resolve=skill.resolve,
+            )
+            for skill in skills
+        )
+        by_name = {skill.spec.name: skill for skill in isolated}
+        if len(by_name) != len(isolated):
             raise ValueError("skill names must be unique")
         self._skills = by_name
 
@@ -76,7 +89,15 @@ class SkillRegistry:
 
     @property
     def specs(self) -> tuple[SkillSpec, ...]:
-        return tuple(skill.spec for skill in self._skills.values())
+        return tuple(
+            SkillSpec(
+                name=skill.spec.name,
+                description=skill.spec.description,
+                risk=skill.spec.risk,
+                input_schema=deepcopy(dict(skill.spec.input_schema)),
+            )
+            for skill in self._skills.values()
+        )
 
     def ollama_tools(self) -> list[dict[str, Any]]:
         return [skill.spec.as_ollama_tool() for skill in self._skills.values()]

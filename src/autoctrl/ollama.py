@@ -7,7 +7,7 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from .domain import CommandRequest, ConversationReply
-from .skills import SkillError, SkillRegistry
+from .skills import SkillError, SkillRegistry, SkillRisk
 
 
 class InterpretationError(RuntimeError):
@@ -36,6 +36,14 @@ class OllamaInterpreter:
         self.seed = seed
         self._transport = transport or self._http_transport
         self._skills = skills or SkillRegistry.builtins()
+        stop = next(
+            (spec for spec in self._skills.specs if spec.name == "stop_vehicle"),
+            None,
+        )
+        if stop is None or stop.risk is not SkillRisk.MOTION_CRITICAL:
+            raise ValueError(
+                "Skill Registry 必須包含 motion_critical 的 stop_vehicle"
+            )
 
     def interpret(self, text: str) -> CommandRequest:
         payload = {

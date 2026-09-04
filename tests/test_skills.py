@@ -39,6 +39,19 @@ class SkillRegistryTests(unittest.TestCase):
         self.assertEqual(move["function"]["parameters"]["required"], ["direction"])
         self.assertFalse(move["function"]["parameters"]["additionalProperties"])
 
+    def test_exported_schema_mutation_does_not_pollute_registry(self) -> None:
+        tools = self.registry.ollama_tools()
+        tools[0]["function"]["parameters"]["properties"]["injected"] = {
+            "type": "string"
+        }
+        exposed_spec = self.registry.specs[0]
+        exposed_spec.input_schema["properties"]["also_injected"] = {
+            "type": "string"
+        }
+
+        fresh = self.registry.ollama_tools()[0]["function"]["parameters"]
+        self.assertEqual(fresh["properties"], {})
+
     def test_resolves_motion_without_changing_domain_contract(self) -> None:
         request = self.registry.resolve(
             "move_linear",
