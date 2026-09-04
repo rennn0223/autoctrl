@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from typing import Protocol
 
-from ..domain import CommandRequest
+from ..domain import CommandRequest, ConversationReply
 from .retrieval import KnowledgeChunk, Ros2KnowledgeBase
 
 
@@ -12,29 +12,46 @@ class KnowledgeResponder(Protocol):
 
     def answer_with_knowledge(
         self, question: str, chunks: tuple[KnowledgeChunk, ...]
-    ) -> CommandRequest: ...
+    ) -> ConversationReply: ...
 
 
-_ROS2_CONCEPT = re.compile(
-    r"ros\s*2|topic|service|action|node|qos|tf2?|odom(?:etry)?|cmd_vel|"
-    r"namespace|remap|domain\s*id|ros_domain_id|dds|zenoh|isaac\s*sim|rosbag|launch|"
-    r"節點|主題|服務|動作|參數|座標系|里程計|命名空間|橋接|通訊",
+_ROS2_LATIN_CONCEPT = re.compile(
+    r"\b(?:ros\s*2|topics?|services?|actions?|nodes?|qos|tf2?|odom(?:etry)?|"
+    r"cmd_vel|namespaces?|remap(?:ping)?|domain\s*id|ros_domain_id|dds|zenoh|"
+    r"isaac\s*sim|rosbag2?|launch)\b",
     re.I,
 )
-_QUESTION = re.compile(
+_ROS2_CHINESE_CONCEPTS = (
+    "節點",
+    "主題",
+    "服務",
+    "動作",
+    "參數",
+    "座標系",
+    "里程計",
+    "命名空間",
+    "橋接",
+    "通訊",
+)
+_TEACHING_CUE = re.compile(
     r"什麼是|是什麼|為什麼|怎麼|如何|用途|意思|差別|差在哪|不同|"
-    r"解釋|介紹|教我|原理|\bwhat\b|\bwhy\b|\bhow\b|"
-    r"\bexplain\b|\bdifference\b|\bwhen\b|\btutorial\b",
+    r"解釋|介紹|教我|原理|\bwhy\b|\bexplain\b|\bdifference\b|"
+    r"\btutorial\b|\bwhat\s+(?:is|are)\b|"
+    r"\bhow\s+(?:does|do|is|are|can|should)\b|"
+    r"\bwhen\s+(?:should|do|does|is)\b",
     re.I,
 )
 
 
 def is_ros2_knowledge_question(text: str) -> bool:
-    return _ROS2_CONCEPT.search(text) is not None and _QUESTION.search(text) is not None
+    has_concept = _ROS2_LATIN_CONCEPT.search(text) is not None or any(
+        concept in text for concept in _ROS2_CHINESE_CONCEPTS
+    )
+    return has_concept and _TEACHING_CUE.search(text) is not None
 
 
 class Ros2KnowledgeInterpreter:
-    """Read-only retrieval layer used only after motion and status fast paths."""
+    """Read-only retrieval layer for explicit ROS 2 teaching questions."""
 
     def __init__(
         self,
@@ -44,26 +61,15 @@ class Ros2KnowledgeInterpreter:
         self._responder = responder
         self._knowledge_base = knowledge_base or Ros2KnowledgeBase.builtins()
 
-    def interpret(self, text: str) -> CommandRequest | None:
+    def interpret(self, text: str) -> ConversationReply | None:
         if not is_ros2_knowledge_question(text):
             return None
         matches = self._knowledge_base.search(text)
         if not matches:
             return None
-        return self._responder.answer_with_knowledge(
+        answer = self._responder.answer_with_knowledge(
             text, tuple(match.chunk for match in matches)
         )
-
-
-class KnowledgeAwareFallback:
-    def __init__(
-        self,
-        fallback: KnowledgeResponder,
-        knowledge: Ros2KnowledgeInterpreter | None = None,
-    ) -> None:
-        self._fallback = fallback
-        self._knowledge = knowledge or Ros2KnowledgeInterpreter(fallback)
-
-    def interpret(self, text: str) -> CommandRequest:
-        answer = self._knowledge.interpret(text)
-        return answer if answer is not None else self._fallback.interpret(text)
+        if not isinstance(answer, ConversationReply):
+            raise TypeError("ROS 2 knowledge responder must return ConversationReply")
+        return answer

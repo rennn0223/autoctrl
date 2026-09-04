@@ -1,9 +1,15 @@
 from __future__ import annotations
 
-from .domain import CommandRequest, MotionKind, StatusKind
+from typing import Protocol
+
+from .domain import CommandRequest, ConversationReply, MotionKind, StatusKind
 from .fast_path import FastPathInterpreter, GuardedFastPathInterpreter
 from .ollama import OllamaInterpreter
 from .status import GuardedStatusFastPathInterpreter, StatusFastPathInterpreter
+
+
+class KnowledgeInterpreter(Protocol):
+    def interpret(self, text: str) -> ConversationReply | None: ...
 
 
 class HybridInterpreter:
@@ -12,10 +18,12 @@ class HybridInterpreter:
         fast_path: FastPathInterpreter | None = None,
         status_path: StatusFastPathInterpreter | None = None,
         ollama: OllamaInterpreter | None = None,
+        knowledge_path: KnowledgeInterpreter | None = None,
     ) -> None:
         self.fast_path = fast_path or GuardedFastPathInterpreter()
         self.status_path = status_path or GuardedStatusFastPathInterpreter()
         self.ollama = ollama or OllamaInterpreter()
+        self.knowledge_path = knowledge_path
 
     def interpret(self, text: str) -> CommandRequest:
         motion_intent = self.fast_path.interpret(text)
@@ -29,6 +37,11 @@ class HybridInterpreter:
             and "停在哪" not in normalized
         ):
             return motion_intent
+
+        if self.knowledge_path is not None:
+            knowledge_reply = self.knowledge_path.interpret(text)
+            if knowledge_reply is not None:
+                return knowledge_reply
 
         status_query = self.status_path.interpret(text)
         if status_query is not None:

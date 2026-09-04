@@ -3,7 +3,7 @@ import unittest
 from autoctrl.domain import ConversationReply, MotionIntent, StatusKind, StatusQuery
 from autoctrl.interpreter import HybridInterpreter
 from autoctrl.knowledge import (
-    KnowledgeAwareFallback,
+    Ros2KnowledgeInterpreter,
     Ros2KnowledgeBase,
     is_ros2_knowledge_question,
 )
@@ -27,6 +27,10 @@ class Ros2KnowledgeRetrievalTests(unittest.TestCase):
         self.assertTrue(is_ros2_knowledge_question("ROS_DOMAIN_ID 有什麼用途？"))
         self.assertTrue(is_ros2_knowledge_question("Isaac Sim 的 odom 怎麼接 ROS2？"))
 
+    def test_latin_concepts_require_word_boundaries(self) -> None:
+        self.assertFalse(is_ros2_knowledge_question("Why is a transaction atomic?"))
+        self.assertFalse(is_ros2_knowledge_question("Explain serviceability"))
+
     def test_live_status_and_motion_are_not_knowledge_questions(self) -> None:
         self.assertFalse(is_ros2_knowledge_question("目前有哪些 ROS topics？"))
         self.assertFalse(is_ros2_knowledge_question("往前走"))
@@ -48,7 +52,9 @@ class KnowledgeAwareFallbackTests(unittest.TestCase):
             return {"message": {"content": "QoS 決定資料傳輸策略。[ROS2-QOS]"}}
 
         ollama = OllamaInterpreter(transport=transport)
-        interpreter = HybridInterpreter(ollama=KnowledgeAwareFallback(ollama))
+        interpreter = HybridInterpreter(
+            ollama=ollama, knowledge_path=Ros2KnowledgeInterpreter(ollama)
+        )
         request = interpreter.interpret("QoS 是什麼？")
 
         self.assertIsInstance(request, ConversationReply)
@@ -58,13 +64,34 @@ class KnowledgeAwareFallbackTests(unittest.TestCase):
         self.assertNotIn("tools", payloads[0])
         self.assertIn("知識片段", payloads[0]["messages"][1]["content"])
 
+    def test_documented_topic_questions_reach_rag(self) -> None:
+        calls = []
+
+        def transport(payload):
+            calls.append(payload)
+            return {"message": {"content": "這是 ROS 2 介面說明。[ROS2-INTERFACES]"}}
+
+        ollama = OllamaInterpreter(transport=transport)
+        interpreter = HybridInterpreter(
+            ollama=ollama, knowledge_path=Ros2KnowledgeInterpreter(ollama)
+        )
+        for text in (
+            "topic 是什麼？",
+            "ROS 2 的 topic、service、action 差在哪？",
+        ):
+            with self.subTest(text=text):
+                request = interpreter.interpret(text)
+                self.assertIsInstance(request, ConversationReply)
+                self.assertEqual(request.source, "ros2_rag")
+        self.assertEqual(len(calls), 2)
+
     def test_motion_stays_on_existing_fast_path_without_model_call(self) -> None:
         calls = []
         ollama = OllamaInterpreter(
             transport=lambda payload: calls.append(payload) or {"message": {"content": "x"}}
         )
         request = HybridInterpreter(
-            ollama=KnowledgeAwareFallback(ollama)
+            ollama=ollama, knowledge_path=Ros2KnowledgeInterpreter(ollama)
         ).interpret("往前走")
         self.assertIsInstance(request, MotionIntent)
         self.assertEqual(calls, [])
@@ -75,11 +102,23 @@ class KnowledgeAwareFallbackTests(unittest.TestCase):
             transport=lambda payload: calls.append(payload) or {"message": {"content": "x"}}
         )
         request = HybridInterpreter(
-            ollama=KnowledgeAwareFallback(ollama)
+            ollama=ollama, knowledge_path=Ros2KnowledgeInterpreter(ollama)
         ).interpret("目前有哪些 ROS topics？")
         self.assertIsInstance(request, StatusQuery)
         self.assertEqual(request.kind, StatusKind.ROS_TOPICS)
         self.assertEqual(calls, [])
+
+    def test_non_text_knowledge_result_is_rejected(self) -> None:
+        class UnsafeResponder:
+            def interpret(self, text):
+                return ConversationReply(content="fallback", original_text=text)
+
+            def answer_with_knowledge(self, question, chunks):
+                return MotionIntent.stop(source="unsafe", original_text=question)
+
+        knowledge = Ros2KnowledgeInterpreter(UnsafeResponder())
+        with self.assertRaisesRegex(TypeError, "must return ConversationReply"):
+            knowledge.interpret("QoS 是什麼？")
 
     def test_general_conversation_falls_through_to_tool_enabled_ollama(self) -> None:
         payloads = []
@@ -89,7 +128,9 @@ class KnowledgeAwareFallbackTests(unittest.TestCase):
             return {"message": {"content": "你好"}}
 
         ollama = OllamaInterpreter(transport=transport)
-        request = KnowledgeAwareFallback(ollama).interpret("你好")
+        request = HybridInterpreter(
+            ollama=ollama, knowledge_path=Ros2KnowledgeInterpreter(ollama)
+        ).interpret("你好")
         self.assertIsInstance(request, ConversationReply)
         self.assertIn("tools", payloads[0])
         self.assertEqual(request.source, "ollama")
