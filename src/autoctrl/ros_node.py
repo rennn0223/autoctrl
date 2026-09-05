@@ -32,6 +32,7 @@ from .ollama import InterpretationError, OllamaInterpreter
 from .sequence import SequentialInterpreter
 from .skills import SkillPolicy, build_skill_registry
 from .twin import TwinMonitor
+from .status import build_topic_status
 
 
 def _yaw_from_quaternion(x: float, y: float, z: float, w: float) -> float:
@@ -166,6 +167,10 @@ class AutoCtrlNode:  # Constructed dynamically so importing the package does not
                 )
                 self._controller = MotionController(config)
                 self._robot_namespace = f"/{namespace.strip('/')}" if namespace.strip("/") else "/"
+                self._simulation_topics = (
+                    self.resolve_topic_name(mirror_cmd_vel_topic) if mirror_cmd_vel_topic else "",
+                    self.resolve_topic_name(simulation_odom_topic) if simulation_odom_topic else "",
+                )
                 self._odom_topic = odom_topic
                 self._power_voltage_topic = power_voltage_topic
                 self._model = model
@@ -417,17 +422,11 @@ class AutoCtrlNode:  # Constructed dynamically so importing the package does not
                         return self._twin_monitor.report()
 
                 if query.kind is StatusKind.ROS_TOPICS:
-                    prefix = self._robot_namespace.rstrip("/") + "/"
-                    topics = [
-                        {"name": name, "types": list(types)}
-                        for name, types in sorted(self.get_topic_names_and_types())
-                        if name.startswith(prefix)
-                    ]
-                    return {
-                        "available": True,
-                        "namespace": self._robot_namespace,
-                        "topics": topics,
-                    }
+                    return build_topic_status(
+                        self.get_topic_names_and_types(),
+                        self._robot_namespace,
+                        self._simulation_topics,
+                    )
 
                 with self._lock:
                     pose = self._pose_feedback.current()

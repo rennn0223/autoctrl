@@ -360,6 +360,20 @@ class ConsoleUI:
             )
             return
 
+        if "groups" in result:
+            segments = [("目前可見的 ROS topics", "bold")]
+            for group in result["groups"]:
+                topics = group["topics"]
+                namespaces = "、".join(group["namespaces"])
+                segments.append((f"\n\n{group['label']} · {namespaces} · {len(topics)} 個", "bold cyan"))
+                if not topics:
+                    segments.append(("\n尚未發現此範圍的 topics。", "grey70"))
+                for item in topics:
+                    segments.append((f"\n{item['name']}  [{', '.join(item['types'])}]", "grey70"))
+            segments.append(("\n\n列出名稱表示已被 ROS graph 發現，不代表正在傳送資料。", "grey50"))
+            self._stream_assistant(segments)
+            return
+
         topics = result.get("topics", [])
         namespace = str(result.get("namespace", "機器人 namespace"))
         segments: list[tuple[str, str]] = [

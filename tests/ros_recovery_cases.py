@@ -99,3 +99,16 @@ def test_feedback_loss_between_timed_and_angle_actions(node):
     assert node._controller.active_intent is None
     assert "aborted" in [state for state, _ in node.statuses]
     assert "completed" not in [state for state, _ in node.statuses]
+
+
+def test_topic_query_includes_configured_simulation(node):
+    from autoctrl.domain import StatusKind, StatusQuery
+    node._simulation_topics = ("/virtual_robot/cmd_vel", "/virtual_robot/odom")
+    node.get_topic_names_and_types = lambda: [
+        (node._robot_namespace + "/odom", ["nav_msgs/msg/Odometry"]),
+        ("/virtual_robot/odom", ["nav_msgs/msg/Odometry"]),
+        ("/unrelated/odom", ["nav_msgs/msg/Odometry"]),
+    ]
+    result = node._answer_status(StatusQuery(StatusKind.ROS_TOPICS))
+    assert len(result["topics"]) == 2
+    assert result["groups"][1]["topics"][0]["name"] == "/virtual_robot/odom"

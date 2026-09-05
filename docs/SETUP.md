@@ -363,3 +363,10 @@ ros2 topic list | grep '^/small/'
 parameter 調整為正值）。回授過期或非有限數值時發布零速度、取消整個剩餘序列，
 回報 `aborted`，不回報動作完成。未指定距離／角度的持續或定時動作保留原行為。
 指定轉角以要求方向的淨旋轉量判定，反轉不會累積成成功。
+
+## 查詢實車與模擬 Topics
+
+輸入「目前有哪些 ROS topics？」會分組列出實車 namespace 與 Isaac Sim namespace。
+模擬範圍由 `mirror_cmd_vel_topic`、`simulation_odom_topic` 的實際 ROS 名稱推導；
+未指定時查詢 `/sim`。沒有發現模擬 topics 時仍顯示該組並提示尚未發現。
+這是唯讀 ROS graph 查詢；topic 可見不代表模擬正在播放或有資料傳送。

@@ -317,7 +317,7 @@ def _builtin_skills() -> tuple[SkillDefinition, ...]:
     status = (
         (
             "query_ros_topics",
-            "唯讀查詢目前設定之機器人 namespace 下的 ROS 2 topics 與訊息型別。",
+            "唯讀查詢目前實車與 Isaac Sim 模擬 namespace 下的 ROS 2 topics 與訊息型別，分組顯示。",
             StatusKind.ROS_TOPICS,
         ),
         (
