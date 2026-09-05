@@ -34,6 +34,13 @@ class PoseFeedback:
         self._pose = pose
         self._received_at = self._clock()
 
+    @property
+    def age_s(self) -> float | None:
+        """Seconds since the last valid receipt; stationary poses are valid."""
+        if self._received_at is None:
+            return None
+        return max(0.0, self._clock() - self._received_at)
+
     def current(self) -> Pose2D | None:
         if self._received_at is None or self._clock() - self._received_at >= self.timeout_s:
             return None

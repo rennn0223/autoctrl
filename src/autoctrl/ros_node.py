@@ -14,6 +14,7 @@ from .console_ui import ConsoleUI, ROS_SLASH_COMMANDS
 from .doctor import (
     DoctorReport,
     build_doctor_report,
+    check_odom_freshness,
     check_ros2_environment,
     check_zenoh_bridge,
 )
@@ -171,6 +172,7 @@ class AutoCtrlNode:  # Constructed dynamically so importing the package does not
                     self.resolve_topic_name(mirror_cmd_vel_topic) if mirror_cmd_vel_topic else "",
                     self.resolve_topic_name(simulation_odom_topic) if simulation_odom_topic else "",
                 )
+                self._simulation_odom_topic = self._simulation_topics[1]
                 self._odom_topic = odom_topic
                 self._power_voltage_topic = power_voltage_topic
                 self._model = model
@@ -187,6 +189,7 @@ class AutoCtrlNode:  # Constructed dynamically so importing the package does not
                 self._pose_feedback = PoseFeedback(
                     float(self.get_parameter("odom_timeout_s").value)
                 )
+                self._simulation_pose_feedback = PoseFeedback(self._pose_feedback.timeout_s)
                 self._simulation_pose: Pose2D | None = None
                 self._twin_monitor = TwinMonitor()
                 self._power_voltage: float | None = None
@@ -269,6 +272,7 @@ class AutoCtrlNode:  # Constructed dynamically so importing the package does not
                 pose = _pose_from_odom(message)
                 with self._lock:
                     self._simulation_pose = pose
+                    self._simulation_pose_feedback.update(pose)
                     self._twin_monitor.update_simulation(pose)
 
             def _on_power_voltage(self, message: Float32) -> None:
@@ -296,7 +300,22 @@ class AutoCtrlNode:  # Constructed dynamically so importing the package does not
                 model_ok, model_detail = self._ollama.check_ready(
                     timeout_s=self._doctor_timeout_s
                 )
+                # Snapshot after the potentially slow dependency probes.
+                with self._lock:
+                    data_checks = [check_odom_freshness(
+                        key="real_odom", label="實車 odom", topic=self._odom_topic,
+                        age_s=self._pose_feedback.age_s,
+                        timeout_s=self._pose_feedback.timeout_s,
+                    )]
+                    if self._simulation_odom_topic:
+                        data_checks.append(check_odom_freshness(
+                            key="simulation_odom", label="Isaac Sim odom",
+                            topic=self._simulation_odom_topic,
+                            age_s=self._simulation_pose_feedback.age_s,
+                            timeout_s=self._simulation_pose_feedback.timeout_s,
+                        ))
                 return build_doctor_report(
+                    data_checks=tuple(data_checks),
                     ros_environment_ok=ros_environment_ok,
                     ros_environment_detail=ros_environment_detail,
                     zenoh_bridge_ok=zenoh_bridge_ok,

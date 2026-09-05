@@ -112,3 +112,36 @@ def test_topic_query_includes_configured_simulation(node):
     result = node._answer_status(StatusQuery(StatusKind.ROS_TOPICS))
     assert len(result["topics"]) == 2
     assert result["groups"][1]["topics"][0]["name"] == "/virtual_robot/odom"
+
+
+def test_doctor_distinguishes_running_container_from_stale_data(node, monkeypatch):
+    import autoctrl.ros_node as module
+    monkeypatch.setattr(module, "check_ros2_environment", lambda: (True, "sourced"))
+    monkeypatch.setattr(module, "check_zenoh_bridge", lambda **kw: (True, "running"))
+    monkeypatch.setattr(node._ollama, "check_ready", lambda **kw: (True, "ready"))
+    now = [0.0]
+    node._pose_feedback = PoseFeedback(clock=lambda: now[0])
+    node._simulation_pose_feedback = PoseFeedback(clock=lambda: now[0])
+    # An unconfigured simulation is omitted, not reported as failed.
+    report = node._doctor_report()
+    assert {c.key for c in report.failures} == {"real_odom"}
+    assert "simulation_odom" not in {c.key for c in report.checks}
+    node._simulation_odom_topic = "/test_sim/odom"
+    message = Odometry()
+    message.pose.pose.orientation.w = 1.0
+    node._on_odom(message)
+    node._on_simulation_odom(message)
+    assert node._doctor_report().ok
+    now[0] = 2.0
+    node._on_simulation_odom(message)
+    report = node._doctor_report()
+    assert {c.key for c in report.failures} == {"real_odom"}
+    assert next(c for c in report.checks if c.key == "zenoh_bridge").ok
+    assert next(c for c in report.checks if c.key == "simulation_odom").ok
+    # Freshness must be sampled AFTER potentially slow dependency probes.
+    def slow_ready(**kw):
+        now[0] += 2.0
+        return True, "ready"
+    monkeypatch.setattr(node._ollama, "check_ready", slow_ready)
+    assert {c.key for c in node._doctor_report().failures} == {"real_odom", "simulation_odom"}
+    assert not node.velocities

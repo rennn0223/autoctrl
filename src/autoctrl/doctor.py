@@ -46,6 +46,7 @@ def build_doctor_report(
     model: str,
     model_ok: bool,
     model_detail: str,
+    data_checks: tuple[DoctorCheck, ...] = (),
 ) -> DoctorReport:
     return DoctorReport(
         (
@@ -57,7 +58,7 @@ def build_doctor_report(
             ),
             DoctorCheck(
                 key="zenoh_bridge",
-                label="Zenoh bridge",
+                label="Zenoh bridge 容器",
                 ok=zenoh_bridge_ok,
                 detail=zenoh_bridge_detail,
             ),
@@ -67,7 +68,7 @@ def build_doctor_report(
                 ok=model_ok,
                 detail=model_detail or model,
             ),
-        )
+        ) + data_checks
     )
 
 
@@ -134,3 +135,15 @@ def check_zenoh_bridge(
     if health:
         status += f" · {health}"
     return False, f"{container_name} · {status}"
+
+
+def check_odom_freshness(
+    *, key: str, label: str, topic: str, age_s: float | None, timeout_s: float,
+) -> DoctorCheck:
+    """A receipt-time check, not proof of bridge connectivity or vehicle motion."""
+    if age_s is None:
+        return DoctorCheck(key, label, False, f"{topic} · 尚未收到有效 odom；topic 存在不代表有資料")
+    ok = age_s < timeout_s
+    state = "最近有收到資料" if ok else "資料逾時；請檢查來源是否啟動／模擬是否播放及通訊"
+    return DoctorCheck(key, label, ok,
+        f"{topic} · {state} · 距上次接收 {age_s:.2f} 秒（門檻 {timeout_s:g} 秒）")

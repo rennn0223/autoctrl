@@ -179,10 +179,17 @@ go right
 /doctor
 ```
 
-`/doctor` 只檢查三項：ROS2 環境是否已 source、DGX 的 `zenoh-bridge`
+`/doctor` 會檢查：ROS2 環境是否已 source、DGX 的 `zenoh-bridge`
 Docker 容器是否為 `running`（若有 healthcheck 也必須為 `healthy`），以及本地
-Ollama 模型是否能回應。小車 driver、`/small/*` topics、odom 與電池資料都不影響
-Doctor 成敗；任何檢查失敗也不會阻止 CLI 開啟。
+Ollama 模型是否能回應。另外獨立檢查實車 odom，以及已設定
+`simulation_odom_topic` 時的 Isaac Sim odom。未設定模擬 odom 時不檢查該項。
+任何檢查失敗都不會阻止 CLI 開啟。
+
+odom 以最近一次有效訊息的本機接收時間判定，門檻沿用 `odom_timeout_s`
+（預設 1 秒），不是查看 topic 名稱是否存在，也不要求座標變動。從未收到或
+資料逾時會分別提示；車子未開、模擬暫停、通訊中斷都可能造成失敗，不能僅憑
+此項斷言 Zenoh 故障。這是當下接收新鮮度檢查，不保證持續傳輸、來源時間戳
+新鮮度或控制指令能送達。檢查不會發布速度，也不會自動重啟 Docker。
 
 `/doctor` 的 Zenoh 項目只確認 **DGX 本機 `zenoh-bridge` 容器狀態**，不代表
 DGX 到機器人的端到端路由或 topics 已經打通。展場控制前仍必須另外執行：
