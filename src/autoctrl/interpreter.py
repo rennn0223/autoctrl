@@ -1,9 +1,32 @@
 from __future__ import annotations
 
-from .domain import CommandRequest, MotionKind, StatusKind
-from .fast_path import FastPathInterpreter, GuardedFastPathInterpreter
+import re
+from typing import Protocol
+
+from .domain import CommandRequest, ConversationReply, MotionIntent, MotionKind, StatusKind
+from .fast_path import FastPathInterpreter, GuardedFastPathInterpreter, is_explicit_stop_prefix
 from .ollama import OllamaInterpreter
 from .status import GuardedStatusFastPathInterpreter, StatusFastPathInterpreter
+
+
+_UNDIRECTED_MOTION_COMMAND = re.compile(
+    r"^(?:(?:please|(?:can|could|would)\s+you)\s+)*"
+    r"(?:(?:make|let|have)\s+(?:the\s+)?(?:robot|car|vehicle)\s+)?"
+    r"(?:move|drive|go|turn|rotate)"
+    r"(?:\s+(?:the\s+)?(?:robot|car|vehicle))?"
+    r"(?:\s+(?:a\s+(?:bit|little)|slightly|somewhere|around))?[.!?]*$"
+    r"|^(?:請)?(?:讓|叫)?(?:小車|機器人|車子)?"
+    r"(?:動|移動|走|開|轉)(?:一下|一點|一小段)?[。！？!?.]*$",
+    re.I,
+)
+
+
+def is_undirected_motion_command(text: str) -> bool:
+    return _UNDIRECTED_MOTION_COMMAND.fullmatch(text.strip()) is not None
+
+
+class KnowledgeInterpreter(Protocol):
+    def interpret(self, text: str) -> ConversationReply | None: ...
 
 
 class HybridInterpreter:
@@ -12,12 +35,26 @@ class HybridInterpreter:
         fast_path: FastPathInterpreter | None = None,
         status_path: StatusFastPathInterpreter | None = None,
         ollama: OllamaInterpreter | None = None,
+        knowledge_path: KnowledgeInterpreter | None = None,
     ) -> None:
         self.fast_path = fast_path or GuardedFastPathInterpreter()
         self.status_path = status_path or GuardedStatusFastPathInterpreter()
         self.ollama = ollama or OllamaInterpreter()
+        self.knowledge_path = knowledge_path
 
     def interpret(self, text: str) -> CommandRequest:
+        if is_explicit_stop_prefix(text):
+            return MotionIntent.stop(source="guarded_fast_path", original_text=text)
+        # Resolve complete teaching questions before extracting motion words.
+        if self.knowledge_path is not None:
+            knowledge_reply = self.knowledge_path.interpret(text)
+            if knowledge_reply is not None:
+                if not isinstance(knowledge_reply, ConversationReply):
+                    raise ValueError(
+                        "knowledge path must return ConversationReply or None"
+                    )
+                return knowledge_reply
+
         motion_intent = self.fast_path.interpret(text)
 
         # Explicit stop remains highest priority. "停在哪裡" is the common
@@ -41,4 +78,9 @@ class HybridInterpreter:
             ):
                 raise ValueError("一次只能控制小車或查詢狀態，請分成兩句輸入")
             return status_query
-        return motion_intent if motion_intent is not None else self.ollama.interpret(text)
+        if motion_intent is not None:
+            return motion_intent
+        # Do not delegate a bare movement command's missing direction to the model.
+        if is_undirected_motion_command(text):
+            raise ValueError("移動命令缺少方向，請指定前進、後退、左轉或右轉")
+        return self.ollama.interpret(text)

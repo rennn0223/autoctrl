@@ -213,7 +213,7 @@ class ConsoleUI:
                 )
             )
         )
-        self.console.print("  [dim]輸入自然語言控制小車，或查詢 ROS topics、目前位置、電池電壓與虛實同動。[/dim]")
+        self.console.print("  [dim]輸入自然語言控制小車、查詢車況，或詢問 ROS 2 概念。[/dim]")
         hints = [
             f"[dim]{command.name}[/dim] [grey50]{command.description}[/grey50]"
             for command in self._slash_commands
@@ -360,6 +360,20 @@ class ConsoleUI:
             )
             return
 
+        if "groups" in result:
+            segments = [("目前可見的 ROS topics", "bold")]
+            for group in result["groups"]:
+                topics = group["topics"]
+                namespaces = "、".join(group["namespaces"])
+                segments.append((f"\n\n{group['label']} · {namespaces} · {len(topics)} 個", "bold cyan"))
+                if not topics:
+                    segments.append(("\n尚未發現此範圍的 topics。", "grey70"))
+                for item in topics:
+                    segments.append((f"\n{item['name']}  [{', '.join(item['types'])}]", "grey70"))
+            segments.append(("\n\n列出名稱表示已被 ROS graph 發現，不代表正在傳送資料。", "grey50"))
+            self._stream_assistant(segments)
+            return
+
         topics = result.get("topics", [])
         namespace = str(result.get("namespace", "機器人 namespace"))
         segments: list[tuple[str, str]] = [
@@ -457,14 +471,14 @@ class ConsoleUI:
                 padding=(0, 1),
             )
 
-        final = Text()
+        final = Text(no_wrap=False, overflow="fold")
         for value, style in segments:
             final.append(value, style=style)
         if self._typing_delay_s <= 0:
-            self.console.print(panel(final))
+            self.console.print(panel(final), soft_wrap=False)
             return
 
-        typed = Text()
+        typed = Text(no_wrap=False, overflow="fold")
         characters = [
             (character, style)
             for value, style in segments
@@ -474,7 +488,7 @@ class ConsoleUI:
             panel(typed),
             console=self.console,
             refresh_per_second=30,
-            transient=False,
+            transient=True,
         ) as live:
             for index in range(0, len(characters), 2):
                 for character, style in characters[index : index + 2]:
@@ -482,6 +496,7 @@ class ConsoleUI:
                 live.update(panel(typed))
                 time.sleep(self._typing_delay_s)
             live.update(panel(final), refresh=True)
+        self.console.print(panel(final), soft_wrap=False)
 
     def _start_activity(self, message: str) -> None:
         with self._lock:

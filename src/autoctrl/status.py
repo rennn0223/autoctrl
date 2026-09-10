@@ -73,3 +73,31 @@ class GuardedStatusFastPathInterpreter(StatusFastPathInterpreter):
         if not unique:
             return None
         return StatusQuery(kind=unique[0], source="guarded_status_fast_path", original_text=text)
+
+
+def build_topic_status(graph, robot_namespace: str, simulation_topics=()) -> dict[str, object]:
+    """Report discovered interfaces for both deployment targets, without inferring health."""
+    real_ns = "/" + robot_namespace.strip("/")
+    sim_namespaces = tuple(dict.fromkeys(
+        (topic.rsplit("/", 1)[0] or "/")
+        for topic in simulation_topics if topic.startswith("/")
+    )) or ("/sim",)
+    scopes = (("real", "實車", (real_ns,)), ("simulation", "Isaac Sim", sim_namespaces))
+    groups = []
+    all_topics = {}
+    for source, label, namespaces in scopes:
+        prefixes = tuple(namespace.rstrip("/") + "/" for namespace in namespaces)
+        topics = [
+            {"name": name, "types": list(types)}
+            for name, types in sorted(graph) if name.startswith(prefixes)
+        ]
+        for topic in topics:
+            all_topics[topic["name"]] = topic
+        groups.append({"source": source, "label": label, "namespaces": list(namespaces), "topics": topics})
+    return {
+        "available": True,
+        "namespace": real_ns,
+        "namespaces": list(dict.fromkeys((real_ns, *sim_namespaces))),
+        "topics": [all_topics[name] for name in sorted(all_topics)],
+        "groups": groups,
+    }

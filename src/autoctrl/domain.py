@@ -97,6 +97,11 @@ class MotionSequence:
             raise ValueError("motion sequence requires at least two actions")
         if any(action.kind is MotionKind.STOP for action in self.actions[:-1]):
             raise ValueError("stop can only be the final action in a motion sequence")
+        if any(
+            action.distance_m is None and action.angle_deg is None and action.duration_s is None
+            for action in self.actions[:-1]
+        ):
+            raise ValueError("序列中非最後的動作必須指定距離、角度或秒數")
 
     def to_dict(self) -> dict[str, Any]:
         return {

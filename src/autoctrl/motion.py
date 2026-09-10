@@ -15,6 +15,38 @@ class Pose2D:
     yaw: float
 
 
+class PoseFeedback:
+    """Freshness is measured by monotonic receipt time, not simulation time."""
+
+    def __init__(self, timeout_s: float = 1.0, *, clock=time.monotonic) -> None:
+        if not math.isfinite(timeout_s) or timeout_s <= 0:
+            raise ValueError("odom timeout must be positive and finite")
+        self.timeout_s = timeout_s
+        self._clock = clock
+        self._pose: Pose2D | None = None
+        self._received_at: float | None = None
+
+    def update(self, pose: Pose2D) -> None:
+        if not all(math.isfinite(value) for value in (pose.x, pose.y, pose.yaw)):
+            self._pose = None
+            self._received_at = None
+            return
+        self._pose = pose
+        self._received_at = self._clock()
+
+    @property
+    def age_s(self) -> float | None:
+        """Seconds since the last valid receipt; stationary poses are valid."""
+        if self._received_at is None:
+            return None
+        return max(0.0, self._clock() - self._received_at)
+
+    def current(self) -> Pose2D | None:
+        if self._received_at is None or self._clock() - self._received_at >= self.timeout_s:
+            return None
+        return self._pose
+
+
 @dataclass(frozen=True, slots=True)
 class Velocity:
     linear_x: float = 0.0
@@ -128,7 +160,7 @@ class MotionController:
             self.stop()
             return Velocity()
         delta = _normalize_angle(pose.yaw - self._last_yaw)
-        self._turned_rad += abs(delta)
+        self._turned_rad += sign * delta
         self._last_yaw = pose.yaw
 
         remaining = math.radians(intent.angle_deg) - self._turned_rad

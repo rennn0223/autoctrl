@@ -16,5 +16,5 @@ set -u
 if [[ ! -f .venv/pyvenv.cfg ]] || ! grep -q "include-system-site-packages = true" .venv/pyvenv.cfg; then
   uv venv --python 3.12 --system-site-packages --clear
 fi
-uv sync
+uv sync --inexact
 echo "AutoCtrl 環境已完成：ROS_DISTRO=${ROS_DISTRO:-unknown}"

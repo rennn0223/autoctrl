@@ -2,9 +2,13 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
+
+if TYPE_CHECKING:
+    from .knowledge import KnowledgeChunk
+
 
 from .domain import CommandRequest, ConversationReply
 from .skills import SkillError, SkillPolicy, SkillRegistry, SkillRisk, SkillSpec
@@ -104,6 +108,53 @@ class OllamaInterpreter:
             )
         except SkillError as exc:
             raise InterpretationError(str(exc)) from exc
+
+    def answer_with_knowledge(
+        self,
+        question: str,
+        chunks: tuple[KnowledgeChunk, ...],
+    ) -> ConversationReply:
+        context = "\n\n".join(chunk.prompt_text() for chunk in chunks)
+        response = self._transport(
+            {
+                "model": self.model,
+                "stream": False,
+                "think": False,
+                "keep_alive": -1,
+                "options": {
+                    "temperature": self.temperature,
+                    "seed": self.seed,
+                },
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": (
+                            "你是 ROS 2 教學助理。只能根據提供的知識片段回答，"
+                            "不知道就明確說不知道。使用繁體中文、簡潔說明，"
+                            "並在相關敘述標示片段 ID，例如 [ROS2-QOS]。"
+                            "這是唯讀知識回答，不得產生或聲稱執行任何車輛命令。"
+                        ),
+                    },
+                    {
+                        "role": "user",
+                        "content": f"知識片段：\n{context}\n\n問題：{question}",
+                    },
+                ],
+            }
+        )
+        message = response.get("message", {})
+        content = str(message.get("content") or "").strip()
+        if not content:
+            raise InterpretationError("模型沒有產生 ROS 2 知識回答")
+        sources = "\n".join(
+            f"- [{chunk.id}] {chunk.title}: {chunk.source_url}"
+            for chunk in chunks
+        )
+        return ConversationReply(
+            content=f"{content}\n\n參考來源：\n{sources}",
+            source="ros2_rag",
+            original_text=question,
+        )
 
     @property
     def skill_specs(self) -> tuple[SkillSpec, ...]:

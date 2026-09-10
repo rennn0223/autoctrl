@@ -179,10 +179,17 @@ go right
 /doctor
 ```
 
-`/doctor` 只檢查三項：ROS2 環境是否已 source、DGX 的 `zenoh-bridge`
+`/doctor` 會檢查：ROS2 環境是否已 source、DGX 的 `zenoh-bridge`
 Docker 容器是否為 `running`（若有 healthcheck 也必須為 `healthy`），以及本地
-Ollama 模型是否能回應。小車 driver、`/small/*` topics、odom 與電池資料都不影響
-Doctor 成敗；任何檢查失敗也不會阻止 CLI 開啟。
+Ollama 模型是否能回應。另外獨立檢查實車 odom，以及已設定
+`simulation_odom_topic` 時的 Isaac Sim odom。未設定模擬 odom 時不檢查該項。
+任何檢查失敗都不會阻止 CLI 開啟。
+
+odom 以最近一次有效訊息的本機接收時間判定，門檻沿用 `odom_timeout_s`
+（預設 1 秒），不是查看 topic 名稱是否存在，也不要求座標變動。從未收到或
+資料逾時會分別提示；車子未開、模擬暫停、通訊中斷都可能造成失敗，不能僅憑
+此項斷言 Zenoh 故障。這是當下接收新鮮度檢查，不保證持續傳輸、來源時間戳
+新鮮度或控制指令能送達。檢查不會發布速度，也不會自動重啟 Docker。
 
 `/doctor` 的 Zenoh 項目只確認 **DGX 本機 `zenoh-bridge` 容器狀態**，不代表
 DGX 到機器人的端到端路由或 topics 已經打通。展場控制前仍必須另外執行：
@@ -324,7 +331,7 @@ set -u
 uv run --with pytest pytest -q
 ```
 
-目前版本應通過 58 項測試與 4 個 subtests。論文用 parser-only 評估另見 `evals/README.md`；它不會載入 ROS 或發布 `/cmd_vel`。
+測試包含解析、Skill 邊界、產品入口與隔離的 ROS 恢復情境，項目數以當次測試輸出為準。論文用 parser-only 評估另見 `evals/README.md`；它不會載入 ROS 或發布 `/cmd_vel`。
 
 ## 疑難排解
 
@@ -356,3 +363,17 @@ ros2 topic list | grep '^/small/'
 ```
 
 並確認小車端的 Zenoh bridge 與 WHEELTEC 底盤 driver 仍在執行。
+
+## 回授逾時
+
+指定距離／角度的動作需要新鮮 odom；`odom_timeout_s` 預設 1.0 秒（可透過 ROS
+parameter 調整為正值）。回授過期或非有限數值時發布零速度、取消整個剩餘序列，
+回報 `aborted`，不回報動作完成。未指定距離／角度的持續或定時動作保留原行為。
+指定轉角以要求方向的淨旋轉量判定，反轉不會累積成成功。
+
+## 查詢實車與模擬 Topics
+
+輸入「目前有哪些 ROS topics？」會分組列出實車 namespace 與 Isaac Sim namespace。
+模擬範圍由 `mirror_cmd_vel_topic`、`simulation_odom_topic` 的實際 ROS 名稱推導；
+未指定時查詢 `/sim`。沒有發現模擬 topics 時仍顯示該組並提示尚未發現。
+這是唯讀 ROS graph 查詢；topic 可見不代表模擬正在播放或有資料傳送。
