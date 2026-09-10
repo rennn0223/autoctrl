@@ -6,16 +6,8 @@ from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
-from .domain import (
-    CommandRequest,
-    ConversationReply,
-    LinearDirection,
-    MotionIntent,
-    MotionKind,
-    StatusKind,
-    StatusQuery,
-    TurnDirection,
-)
+from .domain import CommandRequest, ConversationReply
+from .skills import SkillError, SkillRegistry, SkillRisk
 
 
 class InterpretationError(RuntimeError):
@@ -35,6 +27,7 @@ class OllamaInterpreter:
         temperature: float = 0.0,
         seed: int = 42,
         transport: Transport | None = None,
+        skills: SkillRegistry | None = None,
     ) -> None:
         self.model = model
         self.base_url = base_url.rstrip("/")
@@ -42,6 +35,15 @@ class OllamaInterpreter:
         self.temperature = temperature
         self.seed = seed
         self._transport = transport or self._http_transport
+        self._skills = skills or SkillRegistry.builtins()
+        stop = next(
+            (spec for spec in self._skills.specs if spec.name == "stop_vehicle"),
+            None,
+        )
+        if stop is None or stop.risk is not SkillRisk.MOTION_CRITICAL:
+            raise ValueError(
+                "Skill Registry 必須包含 motion_critical 的 stop_vehicle"
+            )
 
     def interpret(self, text: str) -> CommandRequest:
         payload = {
@@ -69,7 +71,7 @@ class OllamaInterpreter:
                 },
                 {"role": "user", "content": text},
             ],
-            "tools": _TOOLS,
+            "tools": self._skills.ollama_tools(),
         }
         response = self._transport(payload)
         message = response.get("message", {})
@@ -93,7 +95,10 @@ class OllamaInterpreter:
             arguments = json.loads(arguments)
         if not isinstance(arguments, dict):
             raise InterpretationError("模型工具參數格式錯誤")
-        return self._to_intent(name, arguments, text)
+        try:
+            return self._skills.resolve(str(name), arguments, text)
+        except SkillError as exc:
+            raise InterpretationError(str(exc)) from exc
 
     def warmup(self) -> None:
         self._transport(
@@ -133,120 +138,3 @@ class OllamaInterpreter:
                 return json.loads(response.read().decode("utf-8"))
         except (HTTPError, URLError, TimeoutError, json.JSONDecodeError) as exc:
             raise InterpretationError(f"Ollama 呼叫失敗: {exc}") from exc
-
-    @staticmethod
-    def _to_intent(name: str, args: dict[str, Any], text: str) -> CommandRequest:
-        try:
-            status_tools = {
-                "query_ros_topics": StatusKind.ROS_TOPICS,
-                "query_robot_pose": StatusKind.ROBOT_POSE,
-                "query_battery_voltage": StatusKind.BATTERY_VOLTAGE,
-            }
-            if name in status_tools:
-                return StatusQuery(
-                    kind=status_tools[name],
-                    source="ollama",
-                    original_text=text,
-                )
-            if name == "stop_vehicle":
-                return MotionIntent.stop(source="ollama", original_text=text)
-            if name == "move_linear":
-                return MotionIntent(
-                    kind=MotionKind.MOVE_LINEAR,
-                    linear_direction=LinearDirection(args["direction"]),
-                    distance_m=_optional_float(args, "distance_m"),
-                    duration_s=_optional_float(args, "duration_s"),
-                    speed_mps=_optional_float(args, "speed_mps"),
-                    source="ollama",
-                    original_text=text,
-                )
-            if name == "rotate_vehicle":
-                return MotionIntent(
-                    kind=MotionKind.ROTATE,
-                    turn_direction=TurnDirection(args["direction"]),
-                    angle_deg=_optional_float(args, "angle_deg"),
-                    duration_s=_optional_float(args, "duration_s"),
-                    angular_speed_rps=_optional_float(args, "angular_speed_rps"),
-                    source="ollama",
-                    original_text=text,
-                )
-        except (KeyError, TypeError, ValueError) as exc:
-            raise InterpretationError(f"模型工具參數無效: {exc}") from exc
-        raise InterpretationError(f"未知工具: {name}")
-
-
-def _optional_float(values: dict[str, Any], key: str) -> float | None:
-    value = values.get(key)
-    return None if value is None else float(value)
-
-
-_TOOLS: list[dict[str, Any]] = [
-    {
-        "type": "function",
-        "function": {
-            "name": "query_ros_topics",
-            "description": "唯讀查詢目前設定之機器人 namespace 下的 ROS 2 topics 與訊息型別。",
-            "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "query_robot_pose",
-            "description": "唯讀查詢小車目前在 odom 座標系中的 x、y 位置與朝向。",
-            "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "query_battery_voltage",
-            "description": "唯讀查詢小車目前回報的電池電壓；不推測未校正的電量百分比。",
-            "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "move_linear",
-            "description": "讓小車直線前進或後退。可用 distance_m 指定距離，或用 duration_s 指定秒數；兩者不可同時提供。都省略時代表持續移動。",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "direction": {"type": "string", "enum": ["forward", "backward"]},
-                    "distance_m": {"type": "number", "exclusiveMinimum": 0},
-                    "duration_s": {"type": "number", "exclusiveMinimum": 0},
-                    "speed_mps": {"type": "number", "exclusiveMinimum": 0},
-                },
-                "required": ["direction"],
-                "additionalProperties": False,
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "rotate_vehicle",
-            "description": "讓阿克曼小車沿弧線左轉或右轉，會同時向前移動。可用 angle_deg 指定角度，或用 duration_s 指定秒數；兩者不可同時提供。都省略時代表持續轉彎。",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "direction": {"type": "string", "enum": ["left", "right"]},
-                    "angle_deg": {"type": "number", "exclusiveMinimum": 0},
-                    "duration_s": {"type": "number", "exclusiveMinimum": 0},
-                    "angular_speed_rps": {"type": "number", "exclusiveMinimum": 0},
-                },
-                "required": ["direction"],
-                "additionalProperties": False,
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "stop_vehicle",
-            "description": "立即停止小車目前的移動。",
-            "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
-        },
-    },
-]
