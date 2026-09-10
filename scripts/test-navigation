@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -eo pipefail
+cd "$(dirname "$0")/.."
+source /opt/ros/jazzy/setup.bash
+source /home/nvidia/IsaacSim-ros_workspaces/jazzy_ws/install/setup.bash
+export ROS_DOMAIN_ID=2 ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST
+export PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}"
+exec python3 -m autoctrl.navigation_experiment "$@"
