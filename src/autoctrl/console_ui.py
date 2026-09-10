@@ -211,7 +211,7 @@ class ConsoleUI:
                 )
             )
         )
-        self.console.print("  [dim]輸入自然語言控制小車，或查詢 ROS topics、目前位置與電池電壓。[/dim]")
+        self.console.print("  [dim]輸入自然語言控制小車，或查詢 ROS topics、目前位置、電池電壓與虛實同動。[/dim]")
         hints = [
             f"[dim]{command.name}[/dim] [grey50]{command.description}[/grey50]"
             for command in self._slash_commands
@@ -299,6 +299,9 @@ class ConsoleUI:
 
     def show_status_result(self, query: StatusQuery, result: dict[str, object]) -> None:
         self._stop_activity()
+        if query.kind is StatusKind.TWIN_STATUS:
+            self.show_twin_status(result)
+            return
         if not bool(result.get("available")):
             self._stream_assistant(
                 [
@@ -355,6 +358,7 @@ class ConsoleUI:
             StatusKind.ROS_TOPICS: "ROS topics",
             StatusKind.ROBOT_POSE: "目前位置",
             StatusKind.BATTERY_VOLTAGE: "電池電壓",
+            StatusKind.TWIN_STATUS: "虛實同動狀態",
         }
         self._stream_assistant(
             [

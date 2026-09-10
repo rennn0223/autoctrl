@@ -287,6 +287,18 @@ ros2 topic pub --once /autoctrl/command std_msgs/msg/String "{data: '停'}"
 ./scripts/autoctrl-ros --ros-args -p robot_namespace:=/
 ```
 
+### 限制提供給 LLM 的 Skill
+
+預設會提供全部內建 Skill。若展示情境只允許唯讀查詢，可用逗號分隔的允許清單；
+`stop_vehicle` 為必要能力，無論清單內容都會保留：
+
+```bash
+AUTOCTRL_LLM_SKILLS=query_ros_topics,query_robot_pose,query_battery_voltage,query_twin_status autoctrl
+```
+
+ROS 2 節點也可使用 `llm_enabled_skills` 參數。這個設定只限制 LLM fallback
+能選擇的能力，不會停用確定性 fast path，也不是速度限制或緊急停止安全層。
+
 ## 可調整的環境變數
 
 | 變數 | 預設值 | 用途 |
@@ -294,6 +306,7 @@ ros2 topic pub --once /autoctrl/command std_msgs/msg/String "{data: '停'}"
 | `AUTOCTRL_ROS_SETUP` | `/opt/ros/jazzy/setup.bash` | ROS2 環境檔 |
 | `AUTOCTRL_LOCAL_ZENOH_DIR` | `/opt/zenoh-bridge` | DGX Zenoh bridge 目錄 |
 | `AUTOCTRL_STARTUP_LOG` | `/tmp/autoctrl-startup.log` | 靜默啟動的完整紀錄 |
+| `AUTOCTRL_LLM_SKILLS` | `*` | 提供給 LLM 的內建 Skill 允許清單 |
 | `ROS_DOMAIN_ID` | `2` | ROS2 domain |
 | `ROS_AUTOMATIC_DISCOVERY_RANGE` | `LOCALHOST` | DDS discovery 範圍 |
 

@@ -21,6 +21,10 @@ class StatusFastPathTests(unittest.TestCase):
         query = self.parser.interpret("現在還剩多少電？")
         self.assertEqual(query.kind, StatusKind.BATTERY_VOLTAGE)
 
+    def test_queries_twin_status(self) -> None:
+        query = self.parser.interpret("目前虛實同動誤差多少？")
+        self.assertEqual(query.kind, StatusKind.TWIN_STATUS)
+
     def test_rejects_multiple_status_queries(self) -> None:
         with self.assertRaises(ValueError):
             self.parser.interpret("告訴我現在位置跟電壓")
@@ -63,6 +67,11 @@ class GuardedStatusFastPathTests(unittest.TestCase):
         query = self.parser.interpret("Where is the robot right now?")
         self.assertIsNotNone(query)
         self.assertEqual(query.kind, StatusKind.ROBOT_POSE)
+
+    def test_english_twin_question_is_deterministic(self) -> None:
+        query = self.parser.interpret("What is the digital twin status?")
+        self.assertIsNotNone(query)
+        self.assertEqual(query.kind, StatusKind.TWIN_STATUS)
 
     def test_english_mixed_status_query_is_rejected(self) -> None:
         with self.assertRaises(ValueError):

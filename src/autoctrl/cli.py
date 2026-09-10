@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import argparse
+import os
 
 from .console_ui import ConsoleUI, EXIT_SLASH_COMMANDS
 from .domain import ConversationReply, StatusQuery
 from .interpreter import HybridInterpreter
 from .motion import MotionConfig
 from .ollama import InterpretationError, OllamaInterpreter
+from .skills import SkillPolicy
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -14,6 +16,11 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("command", nargs="*", help="例如：往前走五十公分")
     parser.add_argument("--model", default="qwen3.6:35b")
     parser.add_argument("--ollama-url", default="http://127.0.0.1:11434")
+    parser.add_argument(
+        "--llm-skills",
+        default=os.environ.get("AUTOCTRL_LLM_SKILLS", "*"),
+        help="提供給 LLM 的 Skill 名稱，以逗號分隔；* 表示全部",
+    )
     parser.add_argument("--warmup", action="store_true", help="預載模型後離開")
     return parser
 
@@ -21,7 +28,11 @@ def _parser() -> argparse.ArgumentParser:
 def main() -> None:
     args = _parser().parse_args()
     ui = ConsoleUI(slash_commands=EXIT_SLASH_COMMANDS)
-    ollama = OllamaInterpreter(model=args.model, base_url=args.ollama_url)
+    ollama = OllamaInterpreter(
+        model=args.model,
+        base_url=args.ollama_url,
+        skill_policy=SkillPolicy.from_csv(args.llm_skills),
+    )
     if args.warmup:
         ui.show_warmup(args.model)
         ollama.warmup()

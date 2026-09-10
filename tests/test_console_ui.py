@@ -103,6 +103,22 @@ class ConsoleUITests(unittest.TestCase):
         self.assertIn("24.60 V", rendered)
         self.assertIn("尚未設定", rendered)
 
+    def test_twin_status_query_uses_existing_twin_renderer(self) -> None:
+        ui, output = self.make_ui()
+        ui.show_status_result(
+            StatusQuery(kind=StatusKind.TWIN_STATUS),
+            {
+                "available": True,
+                "real_displacement_m": 1.0,
+                "simulation_displacement_m": 1.1,
+                "displacement_error_m": 0.1,
+                "heading_error_deg": 2.0,
+            },
+        )
+        rendered = output.getvalue()
+        self.assertIn("虛實同動", rendered)
+        self.assertIn("位移差 0.100 m", rendered)
+
     def test_chat_cards_label_user_and_assistant(self) -> None:
         ui, output = self.make_ui()
         ui.show_user_message("目前電壓多少？")

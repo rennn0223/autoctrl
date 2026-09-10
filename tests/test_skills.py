@@ -20,6 +20,7 @@ class SkillRegistryTests(unittest.TestCase):
                 "query_ros_topics",
                 "query_robot_pose",
                 "query_battery_voltage",
+                "query_twin_status",
                 "move_linear",
                 "rotate_vehicle",
                 "stop_vehicle",
@@ -66,6 +67,36 @@ class SkillRegistryTests(unittest.TestCase):
     def test_resolves_read_only_status(self) -> None:
         request = self.registry.resolve("query_robot_pose", {}, "現在在哪裡")
         self.assertEqual(request.kind, StatusKind.ROBOT_POSE)
+
+    def test_resolves_twin_status_as_read_only_query(self) -> None:
+        request = self.registry.resolve("query_twin_status", {}, "虛實差多少")
+        self.assertEqual(request.kind, StatusKind.TWIN_STATUS)
+
+    def test_rejects_non_schema_numbers_and_non_finite_values(self) -> None:
+        for value in (
+            "0.8",
+            True,
+            float("nan"),
+            float("inf"),
+            float("-inf"),
+            10**400,
+            -(10**400),
+        ):
+            with self.subTest(value=value):
+                with self.assertRaises(SkillArgumentsError):
+                    self.registry.resolve(
+                        "move_linear",
+                        {"direction": "forward", "distance_m": value},
+                        "往前",
+                    )
+
+    def test_rejects_missing_required_and_invalid_enum(self) -> None:
+        with self.assertRaises(SkillArgumentsError):
+            self.registry.resolve("move_linear", {}, "往前")
+        with self.assertRaises(SkillArgumentsError):
+            self.registry.resolve(
+                "move_linear", {"direction": "sideways"}, "旁邊走"
+            )
 
     def test_rejects_unknown_skill(self) -> None:
         with self.assertRaises(SkillNotFoundError):
