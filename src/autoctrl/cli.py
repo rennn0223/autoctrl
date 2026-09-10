@@ -8,7 +8,11 @@ from .domain import ConversationReply, StatusQuery
 from .interpreter import HybridInterpreter
 from .motion import MotionConfig
 from .ollama import InterpretationError, OllamaInterpreter
-from .skills import SkillPolicy
+from .skills import (
+    ExternalSkillError,
+    SkillPolicy,
+    build_skill_registry,
+)
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -16,6 +20,11 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("command", nargs="*", help="例如：往前走五十公分")
     parser.add_argument("--model", default="qwen3.6:35b")
     parser.add_argument("--ollama-url", default="http://127.0.0.1:11434")
+    parser.add_argument(
+        "--external-skills",
+        default=os.environ.get("AUTOCTRL_EXTERNAL_SKILLS", ""),
+        help="允許載入的外部 Skill provider，以逗號分隔",
+    )
     parser.add_argument(
         "--llm-skills",
         default=os.environ.get("AUTOCTRL_LLM_SKILLS", "*"),
@@ -28,11 +37,16 @@ def _parser() -> argparse.ArgumentParser:
 def main() -> None:
     args = _parser().parse_args()
     ui = ConsoleUI(slash_commands=EXIT_SLASH_COMMANDS)
-    ollama = OllamaInterpreter(
-        model=args.model,
-        base_url=args.ollama_url,
-        skill_policy=SkillPolicy.from_csv(args.llm_skills),
-    )
+    try:
+        skills = build_skill_registry(args.external_skills)
+        ollama = OllamaInterpreter(
+            model=args.model,
+            base_url=args.ollama_url,
+            skills=skills,
+            skill_policy=SkillPolicy.from_csv(args.llm_skills),
+        )
+    except (ExternalSkillError, ValueError) as exc:
+        raise SystemExit(f"Skill 設定錯誤: {exc}") from exc
     if args.warmup:
         ui.show_warmup(args.model)
         ollama.warmup()
@@ -55,6 +69,9 @@ def main() -> None:
         if text.lower() == "/exit":
             ui.show_goodbye()
             return
+        if text.lower() == "/skills":
+            ui.show_skills(ollama.skill_specs)
+            continue
         if text:
             _show_intent(ui, interpreter, config, text)
 

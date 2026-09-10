@@ -12,6 +12,7 @@ from autoctrl.console_ui import (
 )
 from autoctrl.domain import MotionIntent, MotionKind, StatusKind, StatusQuery, TurnDirection
 from autoctrl.motion import MotionConfig
+from autoctrl.skills import SkillRegistry
 
 
 class ConsoleUITests(unittest.TestCase):
@@ -43,7 +44,7 @@ class ConsoleUITests(unittest.TestCase):
         )
         self.assertEqual(
             [completion.text for completion in all_commands],
-            ["/doctor", "/twin", "/exit"],
+            ["/doctor", "/twin", "/skills", "/exit"],
         )
 
         exit_only = list(
@@ -62,6 +63,7 @@ class ConsoleUITests(unittest.TestCase):
         rendered = output.getvalue()
         self.assertIn("/doctor", rendered)
         self.assertIn("/twin", rendered)
+        self.assertIn("/skills", rendered)
         self.assertIn("/exit", rendered)
 
     def test_header_card_is_centered_in_wide_terminal(self) -> None:
@@ -80,6 +82,16 @@ class ConsoleUITests(unittest.TestCase):
             line for line in output.getvalue().splitlines() if "╭" in line
         )
         self.assertGreater(len(border_line) - len(border_line.lstrip()), 0)
+
+    def test_skills_view_lists_name_risk_and_description(self) -> None:
+        ui, output = self.make_ui()
+        ui.show_skills(SkillRegistry.builtins().specs)
+        rendered = output.getvalue()
+        self.assertIn("目前啟用 7 個 Skill", rendered)
+        self.assertIn("query_robot_pose", rendered)
+        self.assertIn("[唯讀]", rendered)
+        self.assertIn("stop_vehicle", rendered)
+        self.assertIn("[停止]", rendered)
 
     def test_turn_result_has_summary_and_velocity_detail(self) -> None:
         ui, output = self.make_ui()

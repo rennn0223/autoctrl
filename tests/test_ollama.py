@@ -24,7 +24,11 @@ class OllamaInterpreterTests(unittest.TestCase):
                         name="read_only_demo",
                         description="demo",
                         risk=SkillRisk.READ_ONLY,
-                        input_schema={"type": "object", "properties": {}},
+                        input_schema={
+                            "type": "object",
+                            "properties": {},
+                            "additionalProperties": False,
+                        },
                     ),
                     resolve=lambda _arguments, _text: None,  # type: ignore[return-value]
                 ),

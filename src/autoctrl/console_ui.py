@@ -32,6 +32,7 @@ from .domain import (
 )
 from .motion import MotionConfig
 from .pixel_pet import render_pixel_pet
+from .skills import SkillRisk, SkillSpec
 
 
 _PIXEL_FONT = {
@@ -56,6 +57,7 @@ class SlashCommand:
 
 
 EXIT_SLASH_COMMANDS = (
+    SlashCommand("/skills", "查看目前啟用能力"),
     SlashCommand("/exit", "安全停止並離開"),
 )
 ROS_SLASH_COMMANDS = (
@@ -296,6 +298,26 @@ class ConsoleUI:
                 ),
             ]
         )
+
+    def show_skills(self, specs: tuple[SkillSpec, ...]) -> None:
+        self._stop_activity()
+        risk_labels = {
+            SkillRisk.READ_ONLY: "唯讀",
+            SkillRisk.MOTION: "移動",
+            SkillRisk.MOTION_CRITICAL: "停止",
+        }
+        segments: list[tuple[str, str]] = [
+            (f"目前啟用 {len(specs)} 個 Skill", "bold")
+        ]
+        for spec in specs:
+            segments.extend(
+                [
+                    (f"\n{spec.name}", "cyan"),
+                    (f"  [{risk_labels[spec.risk]}]", "grey50"),
+                    (f"\n  {spec.description}", "grey70"),
+                ]
+            )
+        self._stream_assistant(segments)
 
     def show_status_result(self, query: StatusQuery, result: dict[str, object]) -> None:
         self._stop_activity()

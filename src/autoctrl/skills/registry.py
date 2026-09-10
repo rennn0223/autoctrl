@@ -5,6 +5,7 @@ from copy import deepcopy
 from dataclasses import dataclass
 from enum import StrEnum
 import math
+import re
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -13,9 +14,11 @@ if TYPE_CHECKING:
 
 from ..domain import (
     CommandRequest,
+    ConversationReply,
     LinearDirection,
     MotionIntent,
     MotionKind,
+    MotionSequence,
     StatusKind,
     StatusQuery,
     TurnDirection,
@@ -44,12 +47,50 @@ class SkillPermissionError(SkillError):
     pass
 
 
+class SkillResultError(SkillError):
+    pass
+
+
 @dataclass(frozen=True, slots=True)
 class SkillSpec:
     name: str
     description: str
     risk: SkillRisk
     input_schema: Mapping[str, Any]
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.name, str) or re.fullmatch(
+            r"[a-z][a-z0-9_]{2,63}", self.name
+        ) is None:
+            raise ValueError(f"Skill 名稱格式錯誤: {self.name!r}")
+        if not isinstance(self.description, str) or not self.description.strip():
+            raise ValueError(f"Skill 說明不可為空白: {self.name}")
+        if not isinstance(self.risk, SkillRisk):
+            raise ValueError(f"Skill risk 格式錯誤: {self.name}")
+        if not isinstance(self.input_schema, Mapping):
+            raise ValueError(f"Skill schema 必須是 object: {self.name}")
+        if self.input_schema.get("type") != "object":
+            raise ValueError(f"Skill schema 頂層 type 必須是 object: {self.name}")
+        properties = self.input_schema.get("properties")
+        if not isinstance(properties, Mapping):
+            raise ValueError(f"Skill schema properties 格式錯誤: {self.name}")
+        if self.input_schema.get("additionalProperties") is not False:
+            raise ValueError(f"Skill schema 必須關閉 additionalProperties: {self.name}")
+        required = self.input_schema.get("required", ())
+        if not isinstance(required, (list, tuple)) or any(
+            not isinstance(item, str) or item not in properties for item in required
+        ):
+            raise ValueError(f"Skill schema required 格式錯誤: {self.name}")
+        supported_types = {"number", "integer", "string", "boolean", "object", "array"}
+        for property_name, property_schema in properties.items():
+            if not isinstance(property_name, str) or not isinstance(
+                property_schema, Mapping
+            ):
+                raise ValueError(f"Skill schema 欄位格式錯誤: {self.name}")
+            if property_schema.get("type") not in supported_types:
+                raise ValueError(
+                    f"Skill schema 欄位 type 不支援: {self.name}.{property_name}"
+                )
 
     def as_ollama_tool(self) -> dict[str, Any]:
         return {
@@ -69,6 +110,12 @@ Resolver = Callable[[Mapping[str, Any], str], CommandRequest]
 class SkillDefinition:
     spec: SkillSpec
     resolve: Resolver
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.spec, SkillSpec):
+            raise ValueError("Skill definition 缺少有效 spec")
+        if not callable(self.resolve):
+            raise ValueError(f"Skill resolver 不可呼叫: {self.spec.name}")
 
 
 class SkillRegistry:
@@ -117,12 +164,20 @@ class SkillRegistry:
                 f"允許清單包含未知 Skill: {', '.join(sorted(unknown))}"
             )
 
+    def enabled_specs(
+        self, policy: SkillPolicy | None = None
+    ) -> tuple[SkillSpec, ...]:
+        return tuple(
+            spec
+            for spec in self.specs
+            if policy is None or policy.allows(spec.name, spec.risk)
+        )
+
     def ollama_tools(self, policy: SkillPolicy | None = None) -> list[dict[str, Any]]:
-        return [
-            skill.spec.as_ollama_tool()
-            for skill in self._skills.values()
-            if policy is None or policy.allows(skill.spec.name, skill.spec.risk)
-        ]
+        return [spec.as_ollama_tool() for spec in self.enabled_specs(policy)]
+
+    def extended(self, skills: Sequence[SkillDefinition]) -> SkillRegistry:
+        return SkillRegistry((*self._skills.values(), *skills))
 
     def resolve(
         self,
@@ -138,11 +193,17 @@ class SkillRegistry:
             raise SkillPermissionError(f"Skill 未被目前策略允許: {name}")
         _validate_arguments(arguments, skill.spec.input_schema)
         try:
-            return skill.resolve(arguments, original_text)
+            request = skill.resolve(arguments, original_text)
         except SkillError:
             raise
         except (KeyError, TypeError, ValueError) as exc:
             raise SkillArgumentsError(f"Skill 參數無效: {exc}") from exc
+        if not isinstance(
+            request,
+            (MotionIntent, MotionSequence, StatusQuery, ConversationReply),
+        ):
+            raise SkillResultError(f"Skill 回傳格式錯誤: {name}")
+        return request
 
 
 def _validate_arguments(
