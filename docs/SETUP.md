@@ -331,7 +331,7 @@ set -u
 uv run --with pytest pytest -q
 ```
 
-目前版本應通過 58 項測試與 4 個 subtests。論文用 parser-only 評估另見 `evals/README.md`；它不會載入 ROS 或發布 `/cmd_vel`。
+測試包含解析、Skill 邊界、產品入口與隔離的 ROS 恢復情境，項目數以當次測試輸出為準。論文用 parser-only 評估另見 `evals/README.md`；它不會載入 ROS 或發布 `/cmd_vel`。
 
 ## 疑難排解
 

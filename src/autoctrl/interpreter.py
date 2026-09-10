@@ -1,11 +1,28 @@
 from __future__ import annotations
 
+import re
 from typing import Protocol
 
 from .domain import CommandRequest, ConversationReply, MotionIntent, MotionKind, StatusKind
 from .fast_path import FastPathInterpreter, GuardedFastPathInterpreter, is_explicit_stop_prefix
 from .ollama import OllamaInterpreter
 from .status import GuardedStatusFastPathInterpreter, StatusFastPathInterpreter
+
+
+_UNDIRECTED_MOTION_COMMAND = re.compile(
+    r"^(?:(?:please|(?:can|could|would)\s+you)\s+)*"
+    r"(?:(?:make|let|have)\s+(?:the\s+)?(?:robot|car|vehicle)\s+)?"
+    r"(?:move|drive|go|turn|rotate)"
+    r"(?:\s+(?:the\s+)?(?:robot|car|vehicle))?"
+    r"(?:\s+(?:a\s+(?:bit|little)|slightly|somewhere|around))?[.!?]*$"
+    r"|^(?:請)?(?:讓|叫)?(?:小車|機器人|車子)?"
+    r"(?:動|移動|走|開|轉)(?:一下|一點|一小段)?[。！？!?.]*$",
+    re.I,
+)
+
+
+def is_undirected_motion_command(text: str) -> bool:
+    return _UNDIRECTED_MOTION_COMMAND.fullmatch(text.strip()) is not None
 
 
 class KnowledgeInterpreter(Protocol):
@@ -61,4 +78,9 @@ class HybridInterpreter:
             ):
                 raise ValueError("一次只能控制小車或查詢狀態，請分成兩句輸入")
             return status_query
-        return motion_intent if motion_intent is not None else self.ollama.interpret(text)
+        if motion_intent is not None:
+            return motion_intent
+        # Do not delegate a bare movement command's missing direction to the model.
+        if is_undirected_motion_command(text):
+            raise ValueError("移動命令缺少方向，請指定前進、後退、左轉或右轉")
+        return self.ollama.interpret(text)

@@ -6,6 +6,7 @@
 
 - 先辨識整句教學意圖，避免提到動作的問題變成控制；其餘命令保留確定性移動、明確停止及即時狀態路徑。
 - LLM 只能選擇 Registry 公開的 Skill，不能透過工具參數指定任意 ROS topic 或自行產生底盤速度。
+- 「讓小車移動一下」「Make the robot move a bit」等簡短無方向命令會在 LLM 前被拒絕，連續命令也逐段檢查；這是特定句型防護，不宣稱涵蓋所有模糊自然語言。
 - 所有移動仍轉成既有 `MotionIntent` / `MotionSequence`，由既有 ROS 2 控制器執行。
 - `stop_vehicle` 必須持續可用，且不被一般能力開關移除。
 - ROS 2 知識 RAG 只能產生文字回答，不得發布速度或觸發其他 Skill。
