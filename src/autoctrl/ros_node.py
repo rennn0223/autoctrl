@@ -20,6 +20,8 @@ from .doctor import (
 )
 from .domain import (
     ConversationReply,
+    NavigationRequest,
+    VisionRequest,
     MotionIntent,
     MotionKind,
     MotionSequence,
@@ -27,6 +29,9 @@ from .domain import (
     StatusQuery,
 )
 from .interpreter import HybridInterpreter
+from .fast_path import is_explicit_stop_prefix
+from .navigation_experiment import Tracker, Point, figure_eight, relative_points
+from .vision import describe_image
 from .knowledge import Ros2KnowledgeInterpreter
 from .motion import MotionConfig, MotionController, Pose2D, PoseFeedback, Velocity
 from .ollama import InterpretationError, OllamaInterpreter
@@ -83,6 +88,7 @@ class AutoCtrlNode:  # Constructed dynamically so importing the package does not
         import rclpy
         from geometry_msgs.msg import Twist
         from nav_msgs.msg import Odometry
+        from sensor_msgs.msg import Image
         from rclpy.node import Node
         from rclpy.qos import qos_profile_sensor_data
         from std_msgs.msg import Float32, String
@@ -91,6 +97,7 @@ class AutoCtrlNode:  # Constructed dynamically so importing the package does not
             def __init__(self) -> None:
                 super().__init__("autoctrl")
                 self.declare_parameter("robot_namespace", "/small")
+                self.declare_parameter("camera_topic", "/sim/rgb")
                 self.declare_parameter("cmd_vel_topic", "cmd_vel")
                 self.declare_parameter("odom_topic", "odom")
                 self.declare_parameter("power_voltage_topic", "PowerVoltage")
@@ -167,6 +174,13 @@ class AutoCtrlNode:  # Constructed dynamically so importing the package does not
                     else None
                 )
                 self._controller = MotionController(config)
+                self._navigation = None
+                self._navigation_started = 0.0
+                self._navigation_progress_at = 0.0
+                self._camera = None
+                self._camera_at = 0.0
+                self._vision_busy = False
+                self._command_generation = 0
                 self._robot_namespace = f"/{namespace.strip('/')}" if namespace.strip("/") else "/"
                 self._simulation_topics = (
                     self.resolve_topic_name(mirror_cmd_vel_topic) if mirror_cmd_vel_topic else "",
@@ -185,6 +199,8 @@ class AutoCtrlNode:  # Constructed dynamically so importing the package does not
                 self._zenoh_container_name = str(
                     self.get_parameter("zenoh_container_name").value
                 )
+                self._odom_frame = None
+                self._navigation_frame = None
                 self._pose: Pose2D | None = None
                 self._pose_feedback = PoseFeedback(
                     float(self.get_parameter("odom_timeout_s").value)
@@ -193,9 +209,9 @@ class AutoCtrlNode:  # Constructed dynamically so importing the package does not
                 self._simulation_pose: Pose2D | None = None
                 self._twin_monitor = TwinMonitor()
                 self._power_voltage: float | None = None
-                self._lock = threading.Lock()
+                self._lock = threading.RLock()
                 self._commands: queue.Queue[
-                    tuple[str, threading.Event | None, bool] | None
+                    tuple[str, threading.Event | None, bool, int] | None
                 ] = queue.Queue()
                 self._pending_motions: deque[MotionIntent] = deque()
                 self._zero_cycles = 0
@@ -207,6 +223,7 @@ class AutoCtrlNode:  # Constructed dynamically so importing the package does not
                     else None
                 )
                 self._status_pub = self.create_publisher(String, status_topic, 10)
+                self.create_subscription(Image, str(self.get_parameter("camera_topic").value), self._on_camera, qos_profile_sensor_data)
                 self.create_subscription(Odometry, odom_topic, self._on_odom, qos_profile_sensor_data)
                 if simulation_odom_topic:
                     self.create_subscription(
@@ -246,24 +263,44 @@ class AutoCtrlNode:  # Constructed dynamically so importing the package does not
                 *,
                 automatic: bool = False,
             ) -> None:
+                if is_explicit_stop_prefix(text):
+                    self.stop_vehicle()
+                    self._publish_status("accepted", intent=MotionIntent.stop(source="ui_stop", original_text=text).to_dict())
+                    if self._interactive:
+                        self._ui.show_conversation_reply("已停止並取消導航與剩餘動作。")
+                    if completed is not None:
+                        completed.set()
+                    return
                 if text.strip():
-                    self._commands.put((text.strip(), completed, automatic))
+                    with self._lock:
+                        self._commands.put((text.strip(), completed, automatic, self._command_generation))
 
             def stop_vehicle(self) -> None:
                 with self._lock:
+                    self._command_generation += 1
+                    self._navigation = None
+                    self._zero_cycles = 3
+                    while True:
+                        try:
+                            queued = self._commands.get_nowait()
+                        except queue.Empty:
+                            break
+                        if queued is not None and queued[1] is not None:
+                            queued[1].set()
                     self._pending_motions.clear()
                     self._controller.stop()
                 for _ in range(3):
                     self._publish_velocity(Velocity())
 
             def destroy_node(self) -> bool:
-                self._commands.put(None)
                 self.stop_vehicle()
+                self._commands.put(None)
                 return super().destroy_node()
 
             def _on_odom(self, message: Odometry) -> None:
                 pose = _pose_from_odom(message)
                 with self._lock:
+                    self._odom_frame = (message.header.frame_id, message.child_frame_id)
                     self._pose = pose
                     self._pose_feedback.update(pose)
                     self._twin_monitor.update_real(pose)
@@ -330,7 +367,7 @@ class AutoCtrlNode:  # Constructed dynamically so importing the package does not
                     item = self._commands.get()
                     if item is None:
                         return
-                    text, completed, automatic = item
+                    text, completed, automatic, generation = item
                     try:
                         if text.lower() == "/doctor":
                             self._run_doctor(automatic=automatic)
@@ -362,34 +399,41 @@ class AutoCtrlNode:  # Constructed dynamically so importing the package does not
                             self._ui.show_parsing()
                         try:
                             request = self._interpreter.interpret(text)
-                            if isinstance(request, ConversationReply):
-                                self._publish_status(
-                                    "replied",
-                                    reply=request.to_dict(),
-                                )
-                                if self._interactive:
-                                    self._ui.show_conversation_reply(request.content)
-                                else:
-                                    self.get_logger().info(
-                                        f"Replied: {request.to_dict()}"
+                            with self._lock:
+                                if generation != self._command_generation:
+                                    continue
+                                if isinstance(request, NavigationRequest):
+                                    self._accept_navigation(request)
+                                elif isinstance(request, VisionRequest):
+                                    self._accept_vision()
+                                elif isinstance(request, ConversationReply):
+                                    self._publish_status(
+                                        "replied",
+                                        reply=request.to_dict(),
                                     )
-                            elif isinstance(request, StatusQuery):
-                                result = self._answer_status(request)
-                                self._publish_status(
-                                    "answered",
-                                    query=request.to_dict(),
-                                    result=result,
-                                )
-                                if self._interactive:
-                                    self._ui.show_status_result(request, result)
-                                else:
-                                    self.get_logger().info(
-                                        f"Answered: query={request.to_dict()} result={result}"
+                                    if self._interactive:
+                                        self._ui.show_conversation_reply(request.content)
+                                    else:
+                                        self.get_logger().info(
+                                            f"Replied: {request.to_dict()}"
+                                        )
+                                elif isinstance(request, StatusQuery):
+                                    result = self._answer_status(request)
+                                    self._publish_status(
+                                        "answered",
+                                        query=request.to_dict(),
+                                        result=result,
                                     )
-                            elif isinstance(request, MotionSequence):
-                                self._accept_sequence(request)
-                            else:
-                                self._accept_motion(request)
+                                    if self._interactive:
+                                        self._ui.show_status_result(request, result)
+                                    else:
+                                        self.get_logger().info(
+                                            f"Answered: query={request.to_dict()} result={result}"
+                                        )
+                                elif isinstance(request, MotionSequence):
+                                    self._accept_sequence(request)
+                                else:
+                                    self._accept_motion(request)
                         except (InterpretationError, ValueError) as exc:
                             self._publish_status("rejected", text=text, reason=str(exc))
                             if self._interactive:
@@ -400,8 +444,100 @@ class AutoCtrlNode:  # Constructed dynamically so importing the package does not
                         if completed is not None:
                             completed.set()
 
+            def _on_camera(self, message) -> None:
+                with self._lock:
+                    self._camera = message
+                    self._camera_at = time.monotonic()
+
+            def _accept_vision(self) -> None:
+                with self._lock:
+                    if self._vision_busy:
+                        raise ValueError("正在看圖，請等待這次描述完成")
+                    if self._camera is None or time.monotonic()-self._camera_at > 2:
+                        raise ValueError("相機沒有新鮮畫面，請確認 Isaac Sim 已按 Play")
+                    frame = self._camera
+                    self._vision_busy = True
+                self._publish_status("vision_started")
+                if self._interactive:
+                    self._ui.show_conversation_reply("正在看前方畫面，完成後會顯示描述；你仍可輸入停止。")
+                def describe():
+                    try:
+                        content = describe_image(self._ollama, frame)
+                        if rclpy.ok():
+                            self._publish_status("vision_completed", description=content)
+                            if self._interactive:
+                                self._ui.show_conversation_reply(content)
+                    except Exception as exc:
+                        if rclpy.ok():
+                            self._publish_status("vision_failed", reason=str(exc))
+                            if self._interactive:
+                                self._ui.show_error(str(exc))
+                    finally:
+                        with self._lock:
+                            self._vision_busy = False
+                threading.Thread(target=describe, daemon=True).start()
+
+            def _accept_navigation(self, request: NavigationRequest) -> None:
+                # Experimental steering geometry is validated only for the Isaac vehicle.
+                if self._odom_topic != "/sim/odom" or self._cmd_pub.topic_name != "/sim/cmd_vel" or self._mirror_cmd_pub is not None:
+                    raise ValueError("請以模擬模式啟動 AutoCtrl UI：scripts/start-sim-ui；目前導航僅在 Isaac Sim 驗收")
+                with self._lock:
+                    pose = self._pose_feedback.current()
+                    if pose is None:
+                        raise ValueError("導航需要新鮮的 Isaac Sim 位置，請確認已按 Play")
+                    points = figure_eight(request.radius_m) if request.radius_m is not None else [Point(*p) for p in request.points]
+                    self._navigation = Tracker(relative_points(points, pose), dense=request.radius_m is not None, speed=min(self._config.linear_speed_mps, .4))
+                    self._navigation_frame = self._odom_frame
+                    self._navigation_started = time.monotonic()
+                    self._navigation_progress_at = 0.
+                    self._controller.stop()
+                    self._pending_motions.clear()
+                    self._zero_cycles = 0
+                self._publish_status("navigation_started", request=request.to_dict())
+                if self._interactive:
+                    description = f"八字：半徑 {request.radius_m:g} 公尺" if request.radius_m is not None else f"依序前往 {request.points} 公尺"
+                    self._ui.show_conversation_reply(description + "。以目前位置為原點，前方 +x、左方 +y；輸入「停止」可取消。")
+
+            def _navigation_tick(self) -> bool:
+                with self._lock:
+                    tracker = self._navigation
+                    if tracker is None:
+                        return False
+                    pose = self._pose_feedback.current()
+                    reason = None
+                    if pose is None:
+                        reason = "位置回授逾時，已停止導航"
+                    elif self._navigation_frame != self._odom_frame:
+                        reason = "座標系改變，已停止導航"
+                    elif time.monotonic()-self._navigation_started > 300:
+                        reason = "導航超過 300 秒，已停止"
+                    if reason:
+                        self._navigation = None
+                        self._zero_cycles = 3
+                        self._publish_velocity(Velocity())
+                        self._publish_status("aborted", reason=reason)
+                        if self._interactive:
+                            self._ui.show_error(reason)
+                        return True
+                    speed, steering = tracker.tick(pose)
+                    self._publish_velocity(Velocity(speed, speed/.24*math.tan(steering)))
+                    if tracker.done:
+                        self._navigation = None
+                        self._zero_cycles = 3
+                        error = math.hypot(pose.x-tracker.points[-1].x, pose.y-tracker.points[-1].y)
+                        self._publish_status("navigation_completed", endpoint_error_m=error)
+                        if self._interactive:
+                            self._ui.show_conversation_reply(f"導航完成，終點誤差 {error*100:.1f} 公分，已停車。")
+                    elif time.monotonic()-self._navigation_progress_at > 5:
+                        self._navigation_progress_at = time.monotonic()
+                        self._publish_status("navigation_progress", reached=tracker.index, total=len(tracker.points))
+                        if self._interactive:
+                            self._ui.show_conversation_reply(f"導航中：{tracker.index}/{len(tracker.points)} 路徑點")
+                    return True
+
             def _accept_motion(self, intent: MotionIntent) -> None:
                 with self._lock:
+                    self._navigation = None
                     self._pending_motions.clear()
                     if intent.kind is MotionKind.STOP:
                         self._zero_cycles = 3
@@ -416,6 +552,7 @@ class AutoCtrlNode:  # Constructed dynamically so importing the package does not
 
             def _accept_sequence(self, sequence: MotionSequence) -> None:
                 with self._lock:
+                    self._navigation = None
                     if self._pose_feedback.current() is None and any(
                         action.distance_m is not None or action.angle_deg is not None
                         for action in sequence.actions
@@ -471,6 +608,8 @@ class AutoCtrlNode:  # Constructed dynamically so importing the package does not
                 return {"available": True, "voltage_v": voltage}
 
             def _control_tick(self) -> None:
+                if self._navigation_tick():
+                    return
                 next_intent: MotionIntent | None = None
                 with self._lock:
                     active = self._controller.active_intent
@@ -508,8 +647,8 @@ class AutoCtrlNode:  # Constructed dynamically so importing the package does not
                     should_publish = is_active or was_active or self._zero_cycles > 0
                     if not is_active and self._zero_cycles > 0:
                         self._zero_cycles -= 1
-                if should_publish:
-                    self._publish_velocity(velocity)
+                    if should_publish:
+                        self._publish_velocity(velocity)
                 if feedback_lost:
                     reason = "odom 回授逾時或無效，已停止並取消剩餘動作"
                     self._publish_status("aborted", reason=reason)

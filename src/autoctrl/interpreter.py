@@ -4,6 +4,7 @@ import re
 from typing import Protocol
 
 from .domain import CommandRequest, ConversationReply, MotionIntent, MotionKind, StatusKind
+from .navigation import interpret_navigation
 from .fast_path import FastPathInterpreter, GuardedFastPathInterpreter, is_explicit_stop_prefix
 from .ollama import OllamaInterpreter
 from .status import GuardedStatusFastPathInterpreter, StatusFastPathInterpreter
@@ -45,6 +46,9 @@ class HybridInterpreter:
     def interpret(self, text: str) -> CommandRequest:
         if is_explicit_stop_prefix(text):
             return MotionIntent.stop(source="guarded_fast_path", original_text=text)
+        high_level = interpret_navigation(text)
+        if high_level is not None:
+            return high_level
         # Resolve complete teaching questions before extracting motion words.
         if self.knowledge_path is not None:
             knowledge_reply = self.knowledge_path.interpret(text)

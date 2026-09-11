@@ -19,4 +19,4 @@ def test_ros_recovery_in_isolated_process():
         capture_output=True, text=True, timeout=30,
     )
     assert result.returncode == 0, result.stdout + result.stderr
-    assert "5 passed" in result.stdout
+    assert "8 passed" in result.stdout

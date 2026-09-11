@@ -44,7 +44,7 @@ class ConsoleUITests(unittest.TestCase):
         )
         self.assertEqual(
             [completion.text for completion in all_commands],
-            ["/doctor", "/twin", "/skills", "/exit"],
+            ["/figure8", "/look", "/doctor", "/twin", "/skills", "/exit"],
         )
 
         exit_only = list(

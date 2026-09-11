@@ -139,4 +139,27 @@ class ConversationReply:
         return asdict(self)
 
 
-CommandRequest = MotionIntent | MotionSequence | StatusQuery | ConversationReply
+@dataclass(frozen=True, slots=True)
+class NavigationRequest:
+    points: tuple[tuple[float, float], ...] = ()
+    radius_m: float | None = None
+
+    def __post_init__(self):
+        import math
+        if bool(self.points) == (self.radius_m is not None):
+            raise ValueError("請指定航點或八字半徑")
+        if self.radius_m is not None and (not math.isfinite(self.radius_m) or not .5 <= self.radius_m <= 5):
+            raise ValueError("八字半徑須介於 0.5 到 5 公尺")
+        if len(self.points) > 20 or any(not math.isfinite(v) or abs(v) > 20 for p in self.points for v in p):
+            raise ValueError("航點最多 20 個，座標須為正負 20 公尺內的有限數值")
+
+    def to_dict(self):
+        return {"kind": "figure8" if self.radius_m is not None else "waypoints", "points": self.points, "radius_m": self.radius_m, "frame": "task_start"}
+
+
+@dataclass(frozen=True, slots=True)
+class VisionRequest:
+    pass
+
+
+CommandRequest = MotionIntent | MotionSequence | StatusQuery | ConversationReply | NavigationRequest | VisionRequest

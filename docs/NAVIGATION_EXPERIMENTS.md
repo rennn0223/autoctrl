@@ -1,7 +1,7 @@
 # Navigation and vision experiments
 
-Branch: `codex/navigation-vlm-experiments`. These are opt-in experiment entry points;
-ordinary natural-language control does not yet dispatch navigation or vision tasks.
+Branch: `codex/navigation-vlm-experiments`. Navigation and vision are now connected to the AutoCtrl ROS UI. The standalone
+experiment commands below remain available for reproducing the original controller tests.
 
 ## Coordinate navigation in Isaac Sim
 
@@ -72,7 +72,7 @@ Measured in Isaac Sim on 2026-09-11:
 These are single-run measurements on the current scene, not a reliability rate.
 The final vehicle heading is unconstrained. The VLM called the yellow part a rear
 wing; the snapshot supports coarse object recognition but not detailed component
-accuracy. Natural-language object-goal navigation is not connected yet.
+accuracy. Object-goal navigation (for example, driving to a visually identified cube) is not connected yet.
 
 Final checks: **185 tests passed**. Simulator fault injection stopped delivering
 odometry to the controller after 5 s; it aborted on stale feedback. A separate
@@ -80,3 +80,52 @@ SIGINT run also aborted cleanly. An independent ROS subscriber observed 10
 zero-speed commands after each cancellation; displacement over the final 0.5 s
 was 0.0096 m in each run. Geometric path RMS error was 1.8 cm for the waypoint run
 and 3.1 cm for the eight (nearest reference segment, separate from endpoint error).
+
+
+## AutoCtrl UI — primary user entry point
+
+Start Isaac Sim, press Play, stop other driving programs, then open the AutoCtrl UI:
+
+```bash
+scripts/start-sim-ui
+```
+
+This is the existing AutoCtrl interactive interface, configured with `/sim/odom`,
+`/sim/cmd_vel`, and `/sim/rgb`. It starts and cleans up the steering converter.
+Navigation executes inside AutoCtrl's control timer, not by spawning the standalone
+experiment script. It is intentionally limited to this simulation configuration;
+real-car and mirrored configurations reject experimental navigation.
+
+Type directly in the UI:
+
+- `先到（0.7, 0），再到（1.4, 0.3）` — ordered coordinates, relative to this task's start.
+- `走八字，半徑 0.8 公尺` or `/figure8` — both loops and then stop.
+- `看看前面` or `/look` — fresh camera frame, described by the configured local model.
+- `停止` — cancels active navigation, queued motion and in-flight command parsing.
+- `/exit` or Ctrl+C — stops and exits AutoCtrl.
+
+UI displays task acceptance, progress every five seconds, completion error, and
+failure reason. Vision runs in a background thread and returns its description in
+the same UI; the input prompt stays available while waiting. It has no motion tools.
+Missing/stale odometry rejects or aborts navigation; a missing/stale camera rejects
+vision. A 300-second deadline stops navigation. Ordinary timed/distance commands
+preempt navigation. Navigation still has no obstacle avoidance or final heading
+constraint. Parser-only `scripts/autoctrl` cannot execute these ROS functions and
+explains that the connected UI is required.
+
+UI acceptance on 2026-09-11 used a real pseudo-terminal running `start-sim-ui`:
+
+| Typed into AutoCtrl | Observed in the UI |
+| --- | --- |
+| `先到（0.7, 0），再到（1.4, 0.3）` | Completed in 17.95 s; reported endpoint error 9.8 cm |
+| `走八字，半徑 0.8 公尺` | Full eight completed in 133.45 s; reported endpoint error 9.9 cm |
+| `看看前面` | Prompt returned immediately; scene description subsequently appeared in the same UI |
+| `走八字` then `停止` while waiting for vision | Navigation cancelled and stop confirmation displayed |
+| `/exit` | Safe exit; converter process cleaned up |
+
+These errors are measured when AutoCtrl declares arrival (within the 10 cm
+threshold), unlike the earlier standalone script's post-stop measurements.
+Local UI transcript and assertions: `results/navigation-ui/terminal.log` and
+`results/navigation-ui/acceptance.json`. Final suite: 196 passed, including an
+isolated ROS subprocess whose eight checks cover cancellation of an in-flight
+parse, queued navigation, stale feedback and completion status.

@@ -145,3 +145,47 @@ def test_doctor_distinguishes_running_container_from_stale_data(node, monkeypatc
     monkeypatch.setattr(node._ollama, "check_ready", slow_ready)
     assert {c.key for c in node._doctor_report().failures} == {"real_odom", "simulation_odom"}
     assert not node.velocities
+
+
+def test_stop_cancels_inflight_parse_and_queued_navigation(node):
+    from autoctrl.domain import NavigationRequest
+    entered, release = threading.Event(), threading.Event()
+    class SlowInterpreter:
+        def interpret(self, text):
+            entered.set()
+            assert release.wait(2)
+            return NavigationRequest(radius_m=.8)
+    node._interpreter = SlowInterpreter()
+    accepted = []
+    node._accept_navigation = accepted.append
+    first, second = threading.Event(), threading.Event()
+    node.submit_command('走八字', first)
+    assert entered.wait(2)
+    node.submit_command('走八字', second)
+    node.submit_command('停止')
+    release.set()
+    assert first.wait(2) and second.wait(2)
+    assert accepted == []
+    assert all(v.stopped for v in node.velocities)
+
+
+def test_navigation_feedback_loss_cancels_and_publishes_stop(node):
+    from autoctrl.navigation_experiment import Point, Tracker
+    node._navigation = Tracker([Point(1,0)])
+    assert node._navigation_tick()
+    assert node._navigation is None
+    assert node.velocities[-1].stopped
+    assert node.statuses[-1][0] == 'aborted'
+
+
+def test_navigation_completion_is_reported_in_ui_status(node):
+    import time
+    from autoctrl.navigation_experiment import Point, Tracker
+    from autoctrl.motion import Pose2D
+    node._pose_feedback.update(Pose2D(0,0,0))
+    node._navigation = Tracker([Point(.05,0)])
+    node._navigation_started = time.monotonic()
+    assert node._navigation_tick()
+    assert node._navigation is None
+    assert node.statuses[-1][0] == 'navigation_completed'
+    assert node.velocities[-1].stopped

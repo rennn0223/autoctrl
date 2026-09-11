@@ -4,6 +4,7 @@ import re
 
 from .domain import CommandRequest, MotionIntent, MotionSequence
 from .interpreter import HybridInterpreter, is_undirected_motion_command
+from .navigation import interpret_navigation
 from .fast_path import is_explicit_stop_prefix
 from .knowledge import is_ros2_knowledge_question
 
@@ -32,6 +33,9 @@ class SequentialInterpreter:
     def interpret(self, text: str) -> CommandRequest:
         if is_explicit_stop_prefix(text):
             return MotionIntent.stop(source="guarded_fast_path", original_text=text)
+        high_level = interpret_navigation(text)
+        if high_level is not None:
+            return high_level
         if is_ros2_knowledge_question(text):
             return self.base.interpret(text)
         clauses = _split_motion_clauses(text)
