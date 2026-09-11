@@ -26,6 +26,8 @@ def node():
     instance.statuses = []
     # Capture all output before executing any test command.
     instance._publish_velocity = instance.velocities.append
+    instance._publish_navigation_velocity_original = instance._publish_navigation_velocity
+    instance._publish_navigation_velocity = instance.velocities.append
     instance._publish_status = lambda state, **details: instance.statuses.append((state, details))
     try:
         yield instance
@@ -189,3 +191,49 @@ def test_navigation_completion_is_reported_in_ui_status(node):
     assert node._navigation is None
     assert node.statuses[-1][0] == 'navigation_completed'
     assert node.velocities[-1].stopped
+
+
+def test_normal_mirrored_ui_can_navigate_using_sim_feedback_only(node):
+    from autoctrl.domain import NavigationRequest
+    from autoctrl.motion import Pose2D
+    class SimPublisher:
+        topic_name = '/sim/cmd_vel'
+        def __init__(self): self.messages = []
+        def publish(self, message): self.messages.append(message)
+    node._publish_navigation_velocity = node._publish_navigation_velocity_original
+    mirror = SimPublisher()
+    node._mirror_cmd_pub = mirror
+    node._simulation_odom_topic = '/sim/odom'
+    node._simulation_pose_feedback.update(Pose2D(0,0,0))
+    # Main/real odometry is absent, matching the user's screenshot.
+    node._accept_navigation(NavigationRequest(radius_m=.8))
+    assert node._navigation is not None
+    node._navigation_tick()
+    assert mirror.messages[-1].linear.x > 0
+    assert all(v.stopped for v in node.velocities)
+    node.stop_vehicle()
+    assert node._navigation is None
+
+
+def test_invalid_replacement_stops_active_navigation(node):
+    from autoctrl.navigation_experiment import Tracker, Point
+    node._navigation = Tracker([Point(1,0)])
+    with pytest.raises(ValueError):
+        node._accept_motion(MotionIntent(kind=MotionKind.MOVE_LINEAR,
+            linear_direction=LinearDirection.FORWARD, distance_m=1))
+    assert node._navigation is None
+    assert node.velocities[-1].stopped
+    assert node._zero_cycles > 0
+
+
+def test_mirrored_navigation_does_not_fall_back_to_real_pose(node):
+    from types import SimpleNamespace
+    from autoctrl.domain import NavigationRequest
+    from autoctrl.motion import Pose2D
+    node._mirror_cmd_pub = SimpleNamespace(topic_name='/sim/cmd_vel')
+    node._simulation_odom_topic = '/sim/odom'
+    node._pose_feedback.update(Pose2D(0,0,0))
+    with pytest.raises(ValueError, match='新鮮的 Isaac Sim'):
+        node._accept_navigation(NavigationRequest(radius_m=.8))
+    assert node._navigation is None
+    node._mirror_cmd_pub = None

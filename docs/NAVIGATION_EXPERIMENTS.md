@@ -87,14 +87,19 @@ and 3.1 cm for the eight (nearest reference segment, separate from endpoint erro
 Start Isaac Sim, press Play, stop other driving programs, then open the AutoCtrl UI:
 
 ```bash
-scripts/start-sim-ui
+scripts/start-exhibition
 ```
 
-This is the existing AutoCtrl interactive interface, configured with `/sim/odom`,
-`/sim/cmd_vel`, and `/sim/rgb`. It starts and cleans up the steering converter.
-Navigation executes inside AutoCtrl's control timer, not by spawning the standalone
-experiment script. It is intentionally limited to this simulation configuration;
-real-car and mirrored configurations reject experimental navigation.
+This is the regular AutoCtrl interface, including its default real + simulation
+configuration. Simulation navigation uses `/sim/odom` and sends motion only to
+`/sim/cmd_vel`; missing real odometry does not block it. It never sends nonzero
+navigation commands to the physical-car output. UI labels these tasks “Isaac Sim
+導航”. Ordinary primitive commands keep their configured control targets.
+
+Navigation executes inside AutoCtrl's control timer. `scripts/start-sim-ui` remains
+an optional simulation-only preset, not a requirement. The regular launcher already
+sets up the simulation steering converter. When Isaac Sim has no fresh position,
+navigation reports that missing connection rather than requiring a different UI.
 
 Type directly in the UI:
 
@@ -129,3 +134,26 @@ Local UI transcript and assertions: `results/navigation-ui/terminal.log` and
 `results/navigation-ui/acceptance.json`. Final suite: 196 passed, including an
 isolated ROS subprocess whose eight checks cover cancellation of an in-flight
 parse, queued navigation, stale feedback and completion status.
+
+
+### Unified-entry correction
+
+The initial UI integration incorrectly required simulation-only launch parameters,
+so the normal real + simulation UI advertised navigation and then rejected it.
+Regression tests now reproduce the normal mirrored configuration with no real
+odometry: navigation must start from fresh simulation odometry and send nonzero
+commands only through the simulation publisher. Another test verifies fresh real
+odometry cannot substitute for missing simulation feedback. Replacing navigation
+with a rejected motion command still sends stop, preventing a latched velocity.
+
+Normal-entry verification (2026-09-11): launched `start-exhibition --skip-robot
+--skip-bridges` with its normal `/small/cmd_vel` + `/sim/cmd_vel` configuration.
+Typed the two-waypoint and figure-eight requests into the UI: both completed,
+in 18.22 s and 134.25 s respectively. The full-eight transcript is retained in
+`results/navigation-normal-ui/`. The initial automation sent stop before the
+input prompt was ready; its stop verdict is not counted. A subsequent UI run
+waited for the prompt, verified vision reply and navigation cancellation, and
+independently observed zero nonzero commands on `/small/cmd_vel`; see
+`results/navigation-normal-ui-stop/acceptance.json` and `real-output-check.json`.
+The manual UI harness now waits for the input prompt before testing stop.
+Final regression suite: 196 passed, including 11 isolated ROS checks.

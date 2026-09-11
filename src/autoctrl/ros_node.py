@@ -175,6 +175,7 @@ class AutoCtrlNode:  # Constructed dynamically so importing the package does not
                 )
                 self._controller = MotionController(config)
                 self._navigation = None
+                self._navigation_uses_simulation_feedback = False
                 self._navigation_started = 0.0
                 self._navigation_progress_at = 0.0
                 self._camera = None
@@ -199,6 +200,7 @@ class AutoCtrlNode:  # Constructed dynamically so importing the package does not
                 self._zenoh_container_name = str(
                     self.get_parameter("zenoh_container_name").value
                 )
+                self._simulation_frame = None
                 self._odom_frame = None
                 self._navigation_frame = None
                 self._pose: Pose2D | None = None
@@ -308,6 +310,7 @@ class AutoCtrlNode:  # Constructed dynamically so importing the package does not
             def _on_simulation_odom(self, message: Odometry) -> None:
                 pose = _pose_from_odom(message)
                 with self._lock:
+                    self._simulation_frame = (message.header.frame_id, message.child_frame_id)
                     self._simulation_pose = pose
                     self._simulation_pose_feedback.update(pose)
                     self._twin_monitor.update_simulation(pose)
@@ -478,36 +481,46 @@ class AutoCtrlNode:  # Constructed dynamically so importing the package does not
                 threading.Thread(target=describe, daemon=True).start()
 
             def _accept_navigation(self, request: NavigationRequest) -> None:
-                # Experimental steering geometry is validated only for the Isaac vehicle.
-                if self._odom_topic != "/sim/odom" or self._cmd_pub.topic_name != "/sim/cmd_vel" or self._mirror_cmd_pub is not None:
-                    raise ValueError("請以模擬模式啟動 AutoCtrl UI：scripts/start-sim-ui；目前導航僅在 Isaac Sim 驗收")
+                mirrored_sim = (
+                    self._mirror_cmd_pub is not None
+                    and self._mirror_cmd_pub.topic_name == "/sim/cmd_vel"
+                    and self._simulation_odom_topic == "/sim/odom"
+                )
+                direct_sim = self._odom_topic == "/sim/odom" and self._cmd_pub.topic_name == "/sim/cmd_vel"
+                if not (mirrored_sim or direct_sim):
+                    raise ValueError("尚未連接 Isaac Sim 控制與位置；請在 AutoCtrl 啟用 Isaac Sim 連線")
                 with self._lock:
-                    pose = self._pose_feedback.current()
+                    feedback = self._simulation_pose_feedback if mirrored_sim else self._pose_feedback
+                    pose = feedback.current()
                     if pose is None:
                         raise ValueError("導航需要新鮮的 Isaac Sim 位置，請確認已按 Play")
                     points = figure_eight(request.radius_m) if request.radius_m is not None else [Point(*p) for p in request.points]
                     self._navigation = Tracker(relative_points(points, pose), dense=request.radius_m is not None, speed=min(self._config.linear_speed_mps, .4))
-                    self._navigation_frame = self._odom_frame
+                    self._navigation_uses_simulation_feedback = mirrored_sim
+                    self._navigation_frame = self._simulation_frame if mirrored_sim else self._odom_frame
                     self._navigation_started = time.monotonic()
                     self._navigation_progress_at = 0.
                     self._controller.stop()
                     self._pending_motions.clear()
                     self._zero_cycles = 0
-                self._publish_status("navigation_started", request=request.to_dict())
+                    self._publish_velocity(Velocity())
+                self._publish_status("navigation_started", target="Isaac Sim", request=request.to_dict())
                 if self._interactive:
                     description = f"八字：半徑 {request.radius_m:g} 公尺" if request.radius_m is not None else f"依序前往 {request.points} 公尺"
-                    self._ui.show_conversation_reply(description + "。以目前位置為原點，前方 +x、左方 +y；輸入「停止」可取消。")
+                    self._ui.show_conversation_reply("Isaac Sim 導航：" + description + "。以目前位置為原點，前方 +x、左方 +y；輸入「停止」可取消。")
 
             def _navigation_tick(self) -> bool:
                 with self._lock:
                     tracker = self._navigation
                     if tracker is None:
                         return False
-                    pose = self._pose_feedback.current()
+                    feedback = self._simulation_pose_feedback if self._navigation_uses_simulation_feedback else self._pose_feedback
+                    frame = self._simulation_frame if self._navigation_uses_simulation_feedback else self._odom_frame
+                    pose = feedback.current()
                     reason = None
                     if pose is None:
                         reason = "位置回授逾時，已停止導航"
-                    elif self._navigation_frame != self._odom_frame:
+                    elif self._navigation_frame != frame:
                         reason = "座標系改變，已停止導航"
                     elif time.monotonic()-self._navigation_started > 300:
                         reason = "導航超過 300 秒，已停止"
@@ -520,7 +533,7 @@ class AutoCtrlNode:  # Constructed dynamically so importing the package does not
                             self._ui.show_error(reason)
                         return True
                     speed, steering = tracker.tick(pose)
-                    self._publish_velocity(Velocity(speed, speed/.24*math.tan(steering)))
+                    self._publish_navigation_velocity(Velocity(speed, speed/.24*math.tan(steering)))
                     if tracker.done:
                         self._navigation = None
                         self._zero_cycles = 3
@@ -535,8 +548,18 @@ class AutoCtrlNode:  # Constructed dynamically so importing the package does not
                             self._ui.show_conversation_reply(f"導航中：{tracker.index}/{len(tracker.points)} 路徑點")
                     return True
 
+            def _publish_navigation_velocity(self, velocity: Velocity) -> None:
+                # A simulation task must never be mirrored back to the physical car.
+                publisher = self._mirror_cmd_pub if self._navigation_uses_simulation_feedback else self._cmd_pub
+                message = Twist()
+                message.linear.x, message.angular.z = velocity.linear_x, velocity.angular_z
+                publisher.publish(message)
+
             def _accept_motion(self, intent: MotionIntent) -> None:
                 with self._lock:
+                    if self._navigation is not None:
+                        self._publish_velocity(Velocity())
+                        self._zero_cycles = 3
                     self._navigation = None
                     self._pending_motions.clear()
                     if intent.kind is MotionKind.STOP:
@@ -552,6 +575,9 @@ class AutoCtrlNode:  # Constructed dynamically so importing the package does not
 
             def _accept_sequence(self, sequence: MotionSequence) -> None:
                 with self._lock:
+                    if self._navigation is not None:
+                        self._publish_velocity(Velocity())
+                        self._zero_cycles = 3
                     self._navigation = None
                     if self._pose_feedback.current() is None and any(
                         action.distance_m is not None or action.angle_deg is not None
