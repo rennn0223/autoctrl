@@ -97,7 +97,7 @@ class CtrlCExitTests(unittest.TestCase):
 
             child.send("/")
             child.expect("安全停止並離開")
-            child.send("\x1b[B\x1b[B\x1b[B\x1b[B")
+            child.send("\x1b[B" * 6)
             child.send("\r")
             child.expect("AutoCtrl 已安全停止")
             child.expect(pexpect.EOF, timeout=1)

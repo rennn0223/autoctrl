@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -eo pipefail
+cd "$(dirname "$0")/.."
+source /opt/ros/jazzy/setup.bash
+source /home/nvidia/IsaacSim-ros_workspaces/jazzy_ws/install/setup.bash
+export ROS_DOMAIN_ID=2 ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST
+if pgrep -f '^python3 .*/cmdvel_to_ackermann.py' >/dev/null; then
+  echo '已有模擬車控制轉接程式，請先停止其他 AutoCtrl 工作階段。' >&2
+  exit 1
+fi
+python3 "$(ros2 pkg prefix cmdvel_to_ackermann)/lib/cmdvel_to_ackermann/cmdvel_to_ackermann.py" --ros-args -r /cmd_vel:=/sim/cmd_vel -r /ackermann_cmd:=/sim/ackermann_cmd -p acceleration:=0.5 -p steering_velocity:=0.5 > /tmp/autoctrl-sim-converter.log 2>&1 &
+converter=$!
+trap 'kill "$converter" 2>/dev/null || true; wait "$converter" 2>/dev/null || true' EXIT
+uv run autoctrl-ros --ros-args -p robot_namespace:=/sim -p cmd_vel_topic:=/sim/cmd_vel -p odom_topic:=/sim/odom -p camera_topic:=/sim/rgb "$@"

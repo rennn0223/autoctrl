@@ -61,6 +61,8 @@ EXIT_SLASH_COMMANDS = (
     SlashCommand("/exit", "安全停止並離開"),
 )
 ROS_SLASH_COMMANDS = (
+    SlashCommand("/figure8", "走八字（半徑 0.8 公尺）"),
+    SlashCommand("/look", "看看前面：描述相機畫面"),
     SlashCommand("/doctor", "檢查模型與 ROS2 狀態"),
     SlashCommand("/twin", "查看虛實同動誤差"),
     *EXIT_SLASH_COMMANDS,
@@ -214,6 +216,8 @@ class ConsoleUI:
             )
         )
         self.console.print("  [dim]輸入自然語言控制小車、查詢車況，或詢問 ROS 2 概念。[/dim]")
+        if any(command.name == "/figure8" for command in self._slash_commands):
+            self.console.print("  [dim]模擬導航：走八字，半徑 0.8 公尺 · 先到（0.7, 0），再到（1.4, 0.3） · 看看前面[/dim]")
         hints = [
             f"[dim]{command.name}[/dim] [grey50]{command.description}[/grey50]"
             for command in self._slash_commands

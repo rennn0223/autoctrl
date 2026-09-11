@@ -4,7 +4,7 @@ import argparse
 import os
 
 from .console_ui import ConsoleUI, EXIT_SLASH_COMMANDS
-from .domain import ConversationReply, StatusQuery
+from .domain import ConversationReply, StatusQuery, NavigationRequest, VisionRequest
 from .interpreter import HybridInterpreter
 from .knowledge import Ros2KnowledgeInterpreter
 from .motion import MotionConfig
@@ -88,7 +88,9 @@ def _show_intent(
     ui.show_parsing()
     try:
         request = interpreter.interpret(text)
-        if isinstance(request, ConversationReply):
+        if isinstance(request, (NavigationRequest, VisionRequest)):
+            ui.show_conversation_reply("請在連接 ROS 的 AutoCtrl UI 執行導航或看圖；目前是僅解析模式。")
+        elif isinstance(request, ConversationReply):
             ui.show_conversation_reply(request.content)
         elif isinstance(request, StatusQuery):
             ui.show_status_requires_ros(request)
